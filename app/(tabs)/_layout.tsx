@@ -1,0 +1,50 @@
+import { Tabs } from 'expo-router';
+import { Home, Calendar, TrendingUp } from 'lucide-react-native';
+
+export default function TabLayout() {
+  return (
+    <Tabs
+      screenOptions={{
+        tabBarActiveTintColor: '#4f46e5',
+        tabBarInactiveTintColor: '#94a3b8',
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopWidth: 0,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.06,
+          shadowRadius: 16,
+          elevation: 16,
+          height: 70,
+          paddingBottom: 10,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '700',
+        },
+        headerShown: false,
+      }}>
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="leaves"
+        options={{
+          title: 'Time Off',
+          tabBarIcon: ({ color, size }) => <Calendar color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="performance"
+        options={{
+          title: 'Performance',
+          tabBarIcon: ({ color, size }) => <TrendingUp color={color} size={size} />,
+        }}
+      />
+    </Tabs>
+  );
+}
