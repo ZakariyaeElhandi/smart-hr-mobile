@@ -2,9 +2,10 @@ import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert,
 import { LinearGradient } from 'expo-linear-gradient';
 import { Plane, CheckCircle, XCircle, Clock, Plus, X } from 'lucide-react-native';
 import { useState } from 'react';
+import type React from 'react';
 import { useAppStore, LeaveRequest } from '../../store/useAppStore';
 
-const STATUS_COLORS: Record<string, { bg: string; text: string; icon: JSX.Element }> = {
+const STATUS_COLORS: Record<string, { bg: string; text: string; icon: React.ReactNode }> = {
   Approved: { bg: '#dcfce7', text: '#15803d', icon: <CheckCircle color="#16a34a" size={18} /> },
   Denied: { bg: '#fee2e2', text: '#b91c1c', icon: <XCircle color="#dc2626" size={18} /> },
   Pending: { bg: '#fef9c3', text: '#92400e', icon: <Clock color="#d97706" size={18} /> },
