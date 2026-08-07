@@ -70,22 +70,39 @@ interface AppState {
   markNotificationsRead: () => void;
 }
 
-// Build in-app notifications by comparing leave statuses
-function buildNotifications(leaves: LeaveRequest[]): Notification[] {
-  return leaves
-    .filter((l) => l.status === 'validate' || l.status === 'Approved' || l.status === 'refuse' || l.status === 'Denied')
-    .slice(0, 15)
-    .map((l) => {
-      const isApproved = l.status === 'validate' || l.status === 'Approved';
-      return {
-        id: `leave-${l.id}`,
-        title: isApproved ? '✅ Leave Approved' : '❌ Leave Refused',
-        message: `${l.leaveType ?? 'Leave'} (${l.startDate} → ${l.endDate}) was ${isApproved ? 'approved' : 'refused'}.`,
-        type: isApproved ? 'approved' : 'refused',
-        timestamp: new Date(),
-        read: false,
-      } as Notification;
+// Build in-app notifications from leave history — shows all actionable leaves
+function buildNotifications(leaves: LeaveRequest[], existing: Notification[]): Notification[] {
+  const readIds = new Set(existing.filter((n) => n.read).map((n) => n.id));
+  const notifs: Notification[] = [];
+
+  leaves.forEach((l) => {
+    const isApproved = l.status === 'validate' || l.status === 'Approved';
+    const isRefused  = l.status === 'refuse'   || l.status === 'Denied';
+    const isPending  = l.status === 'confirm'  || l.status === 'Pending';
+
+    if (!isApproved && !isRefused && !isPending) return;
+
+    const id = `leave-${l.id}`;
+    const title = isApproved ? '✅ Leave Approved'
+      : isRefused ? '❌ Leave Refused'
+      : '⏳ Leave Pending Review';
+    const message = isApproved
+      ? `Your ${l.leaveType ?? 'leave'} request (${l.startDate} → ${l.endDate}) was approved.`
+      : isRefused
+      ? `Your ${l.leaveType ?? 'leave'} request (${l.startDate} → ${l.endDate}) was refused.`
+      : `Your ${l.leaveType ?? 'leave'} request (${l.startDate} → ${l.endDate}) is awaiting approval.`;
+
+    notifs.push({
+      id,
+      title,
+      message,
+      type: isApproved ? 'approved' : isRefused ? 'refused' : 'info',
+      timestamp: new Date(),
+      read: readIds.has(id),
     });
+  });
+
+  return notifs;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -187,7 +204,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         numberOfDays: l.number_of_days,
         aiRecommendation: l.ai_recommendation,
       }));
-      const notifs = buildNotifications(mapped);
+      const notifs = buildNotifications(mapped, get().notifications);
       set({ leaveRequests: mapped, notifications: notifs });
     } catch (_) {}
 

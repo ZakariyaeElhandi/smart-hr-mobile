@@ -24,7 +24,7 @@ export default function PerformanceScreen() {
     <View style={styles.container}>
       <LinearGradient colors={['#0f172a', '#1e1b4b']} style={styles.header}>
         <Text style={styles.headerTitle}>Performance</Text>
-        <Text style={styles.headerSub}>AI-Powered Career Insights</Text>
+        <Text style={styles.headerSub}>Appraisals & AI Career Insights</Text>
 
         {/* Score Ring */}
         <View style={styles.scoreCard}>

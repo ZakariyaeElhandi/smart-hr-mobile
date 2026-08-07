@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Smart HR Mobile — Feature Documentation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+  :root {
+    --indigo: #4f46e5;
+    --violet: #7c3aed;
+    --emerald: #10b981;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --slate: #0f172a;
+    --muted: #64748b;
+    --light: #f8fafc;
+    --border: #e2e8f0;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #fff;
+    color: var(--slate);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  /* ── COVER PAGE ── */
+  .cover {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 40%, #4f46e5 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 40px;
+    page-break-after: always;
+    text-align: center;
+  }
+  .cover-badge {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #a5b4fc;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 8px 20px;
+    border-radius: 99px;
+    margin-bottom: 32px;
+  }
+  .cover h1 {
+    font-size: 52px;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1.1;
+    margin-bottom: 16px;
+  }
+  .cover h1 span { color: #818cf8; }
+  .cover-sub {
+    color: rgba(255,255,255,0.6);
+    font-size: 17px;
+    margin-bottom: 60px;
+    max-width: 500px;
+  }
+  .cover-divider {
+    width: 60px;
+    height: 3px;
+    background: linear-gradient(90deg, #6366f1, #a855f7);
+    border-radius: 99px;
+    margin: 0 auto 40px;
+  }
+  .cover-tags {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 60px;
+  }
+  .cover-tag {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.8);
+    padding: 8px 18px;
+    border-radius: 99px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .cover-meta {
+    color: rgba(255,255,255,0.35);
+    font-size: 12px;
+    margin-top: auto;
+  }
+
+  /* ── PAGE WRAPPER ── */
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 48px 48px 64px;
+  }
+
+  /* ── SECTION HEADERS ── */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 28px;
+    padding-bottom: 14px;
+    border-bottom: 2px solid var(--border);
+  }
+  .section-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .section-title {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--slate);
+  }
+  .section-sub {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  /* ── FEATURE CARDS ── */
+  .features-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .feature-card {
+    background: var(--light);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+  }
+  .feature-card.full { grid-column: 1 / -1; }
+  .feature-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--slate);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .feature-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+  }
+  .feature-body {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  .feature-body ul {
+    padding-left: 16px;
+    margin-top: 4px;
+  }
+  .feature-body li { margin-bottom: 4px; }
+
+  /* ── BADGES ── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .badge-green  { background: #dcfce7; color: #15803d; }
+  .badge-amber  { background: #fef9c3; color: #92400e; }
+  .badge-red    { background: #fee2e2; color: #b91c1c; }
+  .badge-indigo { background: #ede9fe; color: #6d28d9; }
+  .badge-blue   { background: #eff6ff; color: #1d4ed8; }
+  .badge-slate  { background: #f1f5f9; color: #475569; }
+
+  /* ── STATUS TABLE ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 12.5px;
+  }
+  thead th {
+    background: var(--slate);
+    color: #fff;
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  thead th:first-child { border-radius: 10px 0 0 0; }
+  thead th:last-child  { border-radius: 0 10px 0 0; }
+  tbody tr:nth-child(even) { background: var(--light); }
+  tbody td { padding: 10px 14px; color: #334155; border-bottom: 1px solid var(--border); }
+
+  /* ── CODE BLOCK ── */
+  pre, code {
+    font-family: 'Courier New', monospace;
+    background: #1e293b;
+    color: #e2e8f0;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+  pre { padding: 18px 20px; margin: 12px 0; overflow-x: auto; }
+  code { padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+
+  /* ── HIGHLIGHT BOX ── */
+  .highlight {
+    border-left: 4px solid var(--indigo);
+    background: #eff6ff;
+    padding: 14px 18px;
+    border-radius: 0 10px 10px 0;
+    margin: 16px 0;
+    font-size: 13px;
+    color: #1e40af;
+  }
+  .highlight.warn { border-color: var(--amber); background: #fffbeb; color: #92400e; }
+  .highlight.success { border-color: var(--emerald); background: #f0fdf4; color: #15803d; }
+
+  /* ── FLOW DIAGRAM ── */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: 20px 0;
+    flex-wrap: wrap;
+  }
+  .flow-step {
+    background: white;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--slate);
+    text-align: center;
+    min-width: 110px;
+  }
+  .flow-step .step-icon { font-size: 20px; display: block; margin-bottom: 4px; }
+  .flow-arrow {
+    font-size: 20px;
+    color: var(--muted);
+    padding: 0 6px;
+  }
+
+  /* ── PRINT ── */
+  @media print {
+    .cover { page-break-after: always; }
+    .page-break { page-break-before: always; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+  .mt { margin-top: 24px; }
+  .mb { margin-bottom: 24px; }
+  .label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════
+     COVER PAGE
+     ════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="cover-badge">📄 Feature Documentation — Phase 2 &amp; 3</div>
+  <h1>Smart HR<br/><span>Mobile App</span></h1>
+  <p class="cover-sub">
+    A complete guide to all features added this session — from live Odoo authentication
+    to interactive calendars, date pickers, and in-app notifications.
+  </p>
+  <div class="cover-divider"></div>
+  <div class="cover-tags">
+    <span class="cover-tag">⚛️ React Native + Expo</span>
+    <span class="cover-tag">🔐 JWT Authentication</span>
+    <span class="cover-tag">📅 Calendar Views</span>
+    <span class="cover-tag">🔔 In-App Notifications</span>
+    <span class="cover-tag">🗓️ Date Picker</span>
+    <span class="cover-tag">🔄 Pull-to-Refresh</span>
+    <span class="cover-tag">🐍 Odoo REST API</span>
+  </div>
+  <p class="cover-meta">Smart HR Project · August 2026</p>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     1. OVERVIEW
+     ════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-header">
+    <div class="section-icon" style="background:#ede9fe">🏗️</div>
+    <div>
+      <div class="section-title">1. What Was Added This Session</div>
+      <div class="section-sub">Phase 2 &amp; 3 — Live API connection + advanced UX features</div>
+    </div>
+  </div>
+
+  <p class="mb">This session took the app from a static UI mockup to a fully working application connected to the real Odoo server. Two major phases were completed:</p>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-title">
+        <div class="feature-icon" style="background:#eff6ff">🔐</div>
+        Phase 2 — Live Odoo Connection
+      </div>
+      <div class="feature-body">
+        <ul>
+          <li>JWT authentication (login / token refresh)</li>
+          <li>Real user profile fetched from Odoo</li>
+          <li>Clock In / Clock Out synced to <code>hr.attendance</code></li>
+          <li>Leave requests submitted to <code>hr.leave</code></li>
+          <li>AI recommendation shown on each leave</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-title">
+        <div class="feature-icon" style="background:#f0fdf4">✨</div>
+        Phase 3 — Advanced UX Features
+      </div>
+      <div class="feature-body">
+        <ul>
+          <li>Interactive attendance calendar with day detail</li>
+          <li>Leave calendar with color-coded spans</li>
+          <li>Drum-style date picker (no manual typing)</li>
+          <li>In-app notification center with unread badge</li>
+          <li>Pull-to-refresh on every screen</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <p class="label">Data Flow</p>
+  <div class="flow">
+    <div class="flow-step"><span class="step-icon">📱</span>Expo Go App</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step"><span class="step-icon">🌐</span>ngrok Tunnel</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step"><span class="step-icon">🔌</span>hr_ai_api<br/>REST Module</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step"><span class="step-icon">🐍</span>Odoo 17<br/>(Docker)</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step"><span class="step-icon">🗄️</span>PostgreSQL<br/>Database</div>
+  </div>
+
+  <hr/>
+
+  <div class="section-header" style="margin-top:32px">
+    <div class="section-icon" style="background:#f0fdf4">🔐</div>
+    <div>
+      <div class="section-title">2. Authentication System</div>
+      <div class="section-sub">utils/api.ts · store/useAppStore.ts · app/login.tsx</div>
+    </div>
+  </div>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-title">🔑 JWT Token Flow</div>
+      <div class="feature-body">
+        The app uses a two-token system:
+        <ul>
+          <li><strong>Access Token</strong> (short-lived) — sent as <code>Bearer</code> header on every request</li>
+          <li><strong>Refresh Token</strong> (long-lived) — used silently to get a new access token when it expires (401 response)</li>
+          <li>Both tokens stored securely in <code>expo-secure-store</code> (encrypted device storage)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-title">👤 Login Screen</div>
+      <div class="feature-body">
+        <ul>
+          <li>Premium dark gradient UI</li>
+          <li>Accepts any Odoo email + password</li>
+          <li>Shows inline error messages</li>
+          <li>Automatically restores previous session on app launch (no re-login needed)</li>
+          <li>Auto-loads all data after successful login</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <p class="label">Login endpoint called</p>
+  <pre>POST /api/v1/auth/token
+Body: { "login": "demo", "password": "1234", "device": "SmartHR-Mobile" }
+
+Response: { "access_token": "...", "refresh_token": "...", "expires_in": 3600 }</pre>
+
+  <div class="highlight">
+    💡 <strong>How to get credentials:</strong> Go to Odoo → Settings → Users → click a user → Action → Change Password. Then log in with that user's login name and the new password.
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     3. HOME SCREEN
+     ════════════════════════════════════════════════════ -->
+<div class="page page-break">
+  <div class="section-header">
+    <div class="section-icon" style="background:#f1f5f9">🏠</div>
+    <div>
+      <div class="section-title">3. Home Screen (Dashboard)</div>
+      <div class="section-sub">app/(tabs)/index.tsx</div>
+    </div>
+  </div>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-title">🔄 Pull-to-Refresh</div>
+      <div class="feature-body">
+        Swipe down on the main scroll area to trigger a full data refresh. Calls <code>refreshData()</code> in the store which:
+        <ul>
+          <li>Re-fetches all leave requests from <code>/api/v1/leaves</code></li>
+          <li>Re-fetches attendance records from <code>/api/v1/attendance/&lt;id&gt;</code></li>
+          <li>Rebuilds notifications from updated leave statuses</li>
+          <li>Updates the clocked-in/out status based on latest attendance</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-title">⏱️ Clock In / Clock Out</div>
+      <div class="feature-body">
+        <ul>
+          <li>Tapping the button calls <code>POST /api/v1/attendance/check-in</code> or <code>check-out</code></li>
+          <li>State (active/offline) updates immediately</li>
+          <li>Today's worked hours refresh automatically after each action</li>
+          <li>Prevents double clock-in (Odoo returns 409 if already checked in)</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-title">🔔 Notification Center</div>
+      <div class="feature-body">
+        Tapping the bell icon opens a full bottom sheet panel:
+        <ul>
+          <li>Shows a notification for every leave request (approved ✅, refused ❌, pending ⏳)</li>
+          <li>Unread notifications highlighted in blue with a dot indicator</li>
+          <li>Badge number on the bell shows unread count</li>
+          <li>Tap "Mark all read" to dismiss the badge</li>
+          <li>Read state is preserved across data refreshes</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-title">⚡ Quick Actions</div>
+      <div class="feature-body">
+        Three action cards below the clock widget:
+        <ul>
+          <li>📅 <strong>Request Time Off</strong> → navigates to the Leaves screen</li>
+          <li>📆 <strong>Attendance Calendar</strong> → opens the interactive calendar</li>
+          <li>📈 <strong>View Performance</strong> → navigates to Performance tab</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <p class="label">Stats cards in the header (real data)</p>
+  <table>
+    <thead><tr><th>Card</th><th>What it shows</th><th>Source</th></tr></thead>
+    <tbody>
+      <tr><td>Status</td><td>Active (green) / Offline (grey)</td><td>Attendance records — last record has no check-out</td></tr>
+      <tr><td>Today</td><td>Worked hours today (e.g. <code>7h 30m</code>)</td><td><code>worked_hours</code> from today's attendance record</td></tr>
+      <tr><td>Pending Req.</td><td>Count of leave requests with status <code>confirm</code></td><td>Zustand store → leaveRequests array</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     4. ATTENDANCE CALENDAR
+     ════════════════════════════════════════════════════ -->
+<div class="page page-break">
+  <div class="section-header">
+    <div class="section-icon" style="background:#ede9fe">📅</div>
+    <div>
+      <div class="section-title">4. Attendance Calendar</div>
+      <div class="section-sub">components/CalendarModal.tsx</div>
+    </div>
+  </div>
+
+  <p class="mb">A fully custom month-grid calendar built with pure React Native — no external library. Opens as a bottom sheet modal from the Home screen.</p>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-title">📆 Calendar Grid</div>
+      <div class="feature-body">
+        <ul>
+          <li>Standard month grid (Sun→Sat columns)</li>
+          <li>Navigate between months with ‹ › arrows</li>
+          <li>Today's date highlighted in blue</li>
+          <li>Days with attendance records show colored dots</li>
+          <li>Up to 3 dots per day if multiple records</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-title">🎨 Dot Color Legend</div>
+      <div class="feature-body">
+        <span class="badge badge-green">● Present</span> &nbsp;On-time arrival, check-out recorded<br/><br/>
+        <span class="badge badge-amber">● Late arrival</span> &nbsp;Arrived after expected start time<br/><br/>
+        <span class="badge badge-red">● Issue</span> &nbsp;Anomaly detected or missing check-out
+      </div>
+    </div>
+
+    <div class="feature-card full">
+      <div class="feature-title">🖱️ Tapping a Day — Detail Bottom Sheet</div>
+      <div class="feature-body">
+        Tapping any marked day opens a second bottom sheet with full attendance detail:
+        <ul>
+          <li><strong>Check-in time</strong> and <strong>Check-out time</strong> displayed side by side (e.g. <code>09:21</code> → <code>18:29</code>)</li>
+          <li><strong>Total worked hours</strong> (e.g. <code>8h 15m</code>)</li>
+          <li><strong>Late minutes</strong> if flagged (e.g. <code>+21 min</code>) with amber warning</li>
+          <li><strong>Anomaly type</strong> if set by Odoo AI anomaly detector (red warning)</li>
+          <li><strong>Missing check-out warning</strong> — red banner if no check-out was recorded</li>
+          <li><strong>All clear</strong> — green banner for perfect attendance days</li>
+        </ul>
+        <br/>
+        Data comes directly from the <code>hr.attendance</code> model via <code>GET /api/v1/attendance/&lt;employee_id&gt;</code>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     5. TIME OFF / LEAVES
+     ════════════════════════════════════════════════════ -->
+<div class="page page-break">
+  <div class="section-header">
+    <div class="section-icon" style="background:#eff6ff">✈️</div>
+    <div>
+      <div class="section-title">5. Time Off Screen</div>
+      <div class="section-sub">app/(tabs)/leaves.tsx</div>
+    </div>
+  </div>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-title">🔄 Pull-to-Refresh</div>
+      <div class="feature-body">
+        Swipe down on the leaves list to reload all statuses from Odoo. Useful to check if a manager has approved a pending request since you last opened the app.
+      </div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-title">📅 Leave Calendar</div>
+      <div class="feature-body">
+        Opens the same calendar component showing each leave request as a colored bar:
+        <ul>
+          <li><span class="badge badge-green">● Approved</span></li>
+          <li><span class="badge badge-amber">● Pending</span></li>
+          <li><span class="badge badge-red">● Refused</span></li>
+        </ul>
+        Multi-day leaves mark every day in the range.
+      </div>
+    </div>
+
+    <div class="feature-card full">
+      <div class="feature-title">🗓️ New Request Form — Drum-Style Date Picker</div>
+      <div class="feature-body">
+        The date input was completely replaced with a native-feeling picker. Instead of typing <code>YYYY-MM-DD</code> manually:
+        <ul>
+          <li>Tap the <strong>Start Date</strong> or <strong>End Date</strong> field → a bottom sheet date picker opens</li>
+          <li>Three independent drum selectors: <strong>Day</strong> | <strong>Month</strong> | <strong>Year</strong></li>
+          <li>Tap the up/down arrows to scroll each drum</li>
+          <li>A live preview shows the full formatted date before confirming</li>
+          <li>Tap <strong>Confirm Date</strong> to apply the selection</li>
+          <li>A <span class="badge badge-indigo">X days requested</span> badge auto-calculates the duration</li>
+        </ul>
+        <br/>
+        Zero external libraries — built entirely with React Native's built-in <code>TouchableOpacity</code> and <code>Modal</code>.
+      </div>
+    </div>
+
+    <div class="feature-card full">
+      <div class="feature-title">📤 Submitting a Leave Request</div>
+      <div class="feature-body">
+        <ol style="padding-left:16px; line-height:2">
+          <li>Select <strong>Leave Type</strong>: Annual (ID 1) / Sick (ID 2) / Personal (ID 4)</li>
+          <li>Pick <strong>Start Date</strong> using the date picker</li>
+          <li>Pick <strong>End Date</strong> using the date picker</li>
+          <li>Write a short <strong>Reason</strong></li>
+          <li>Tap <strong>Submit to Odoo</strong></li>
+          <li>The request is created in Odoo as <code>hr.leave</code> with state <code>confirm</code></li>
+          <li>The <code>hr_leaves_ai</code> module immediately calculates an AI recommendation</li>
+          <li>A confirmation alert shows the AI recommendation if one was generated</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <p class="label">Leave type IDs (must match your Odoo database)</p>
+  <table>
+    <thead><tr><th>App Label</th><th>Odoo ID</th><th>Odoo Leave Type Name</th></tr></thead>
+    <tbody>
+      <tr><td>Annual</td><td>1</td><td>Paid Time Off</td></tr>
+      <tr><td>Sick</td><td>2</td><td>Sick Time Off</td></tr>
+      <tr><td>Personal</td><td>4</td><td>Unpaid</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     6. NOTIFICATIONS
+     ════════════════════════════════════════════════════ -->
+<div class="page page-break">
+  <div class="section-header">
+    <div class="section-icon" style="background:#fee2e2">🔔</div>
+    <div>
+      <div class="section-title">6. In-App Notification Center</div>
+      <div class="section-sub">components/NotificationsModal.tsx · store/useAppStore.ts</div>
+    </div>
+  </div>
+
+  <p class="mb">Since Firebase push notifications require a complex cloud setup, the app implements an in-app notification center instead — a rich panel showing all leave status events.</p>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-title">🔴 Bell Icon Badge</div>
+      <div class="feature-body">
+        The bell icon in the top-right corner of the Home screen displays a red badge with the count of unread notifications. Updates automatically when data refreshes.
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-title">✉️ Notification Types</div>
+      <div class="feature-body">
+        <ul>
+          <li><span class="badge badge-green">✅ Approved</span> — leave was validated by manager</li>
+          <li><span class="badge badge-red">❌ Refused</span> — leave was refused by manager</li>
+          <li><span class="badge badge-blue">⏳ Pending</span> — leave awaiting manager action</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card full">
+      <div class="feature-title">🔄 How Notifications Are Generated</div>
+      <div class="feature-body">
+        Notifications are built from the live leave request data pulled from Odoo. Every time the app refreshes:
+        <ul>
+          <li>Each leave request generates one notification card</li>
+          <li>The <strong>read state is preserved</strong> across refreshes — a notification you've already seen won't re-appear as unread</li>
+          <li>Tapping the bell opens the panel (unread badge stays until you tap "Mark all read")</li>
+          <li>The panel shows the leave type, date range, and status in plain language</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <hr/>
+
+  <div class="section-header" style="margin-top:32px">
+    <div class="section-icon" style="background:#f0fdf4">📈</div>
+    <div>
+      <div class="section-title">7. Performance &amp; Appraisals Tab</div>
+      <div class="section-sub">app/(tabs)/performance.tsx</div>
+    </div>
+  </div>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-title">🏆 Performance Score Ring</div>
+      <div class="feature-body">
+        Circular score display with dynamic color (green &gt;90, amber &gt;75, red below). Currently shows a mock score — will connect to real appraisal data when the API endpoint is built.
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-title">🤖 AI Career Summary</div>
+      <div class="feature-body">
+        Gemini-powered insight card giving personalized career advice based on employee metrics. Highlights key areas for growth.
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-title">📊 Skill Breakdown</div>
+      <div class="feature-body">
+        Horizontal progress bars for each tracked skill (e.g. React Native 88%, TypeScript 82%). Visual representation of competency levels.
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-title">🏅 Appraisal History</div>
+      <div class="feature-body">
+        Cards for each formal HR review period (Q1 2026, Q2 2026 etc.) showing the score, reviewer's comment, and reviewer name.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     8. SETUP & RUN
+     ════════════════════════════════════════════════════ -->
+<div class="page page-break">
+  <div class="section-header">
+    <div class="section-icon" style="background:#fef9c3">⚙️</div>
+    <div>
+      <div class="section-title">8. Setup &amp; How to Run</div>
+      <div class="section-sub">Complete step-by-step guide</div>
+    </div>
+  </div>
+
+  <p class="label">Step 1 — Start Odoo</p>
+  <pre>cd "C:\Users\nicol\Desktop\stage odoo\Rh_automatise-odoo"
+docker compose up -d</pre>
+  <p style="color:var(--muted); margin-bottom:16px">Verify Odoo is running at <strong>http://localhost:8070</strong></p>
+
+  <p class="label">Step 2 — Find your IP address</p>
+  <pre>ipconfig
+# Look for: IPv4 Address . . . . . . . 10.41.252.144 (example)</pre>
+
+  <p class="label">Step 3 — Set the IP in .env</p>
+  <p style="color:var(--muted); margin-bottom:8px">Open <code>smart-hr-mobile/.env</code> and update the IP:</p>
+  <pre>EXPO_PUBLIC_API_BASE_URL=http://10.41.252.144:8070</pre>
+  <div class="highlight warn">⚠️ Update this IP every time your computer connects to a different network.</div>
+
+  <p class="label">Step 4 — Install dependencies (first time only)</p>
+  <pre>cd "C:\Users\nicol\Desktop\stage odoo\smart-hr-mobile"
+npm install</pre>
+
+  <p class="label">Step 5 — Start the Expo server</p>
+  <pre>npx expo start --tunnel</pre>
+  <div class="highlight success">✅ The <code>--tunnel</code> flag bypasses Windows firewall and Wi-Fi isolation. Your phone can connect even on restricted networks.</div>
+
+  <p class="label">Step 6 — Open on your phone</p>
+  <table>
+    <thead><tr><th>Device</th><th>Steps</th></tr></thead>
+    <tbody>
+      <tr><td><strong>iPhone</strong></td><td>Open Camera app → point at QR code → tap "Open in Expo Go"</td></tr>
+      <tr><td><strong>Android</strong></td><td>Open Expo Go app → tap "Scan QR Code" → point at QR code</td></tr>
+    </tbody>
+  </table>
+
+  <hr/>
+
+  <p class="label">All API endpoints used by the app</p>
+  <table>
+    <thead>
+      <tr><th>Method</th><th>Endpoint</th><th>Purpose</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="badge badge-blue">POST</span></td><td><code>/api/v1/auth/token</code></td><td>Login — returns access + refresh tokens</td></tr>
+      <tr><td><span class="badge badge-blue">POST</span></td><td><code>/api/v1/auth/refresh</code></td><td>Silent token refresh when access token expires</td></tr>
+      <tr><td><span class="badge badge-green">GET</span></td><td><code>/api/v1/auth/me</code></td><td>Get logged-in user profile &amp; employee ID</td></tr>
+      <tr><td><span class="badge badge-green">GET</span></td><td><code>/api/v1/leaves</code></td><td>Fetch all leave requests for the employee</td></tr>
+      <tr><td><span class="badge badge-blue">POST</span></td><td><code>/api/v1/leaves</code></td><td>Create a new leave request</td></tr>
+      <tr><td><span class="badge badge-green">GET</span></td><td><code>/api/v1/attendance/&lt;id&gt;</code></td><td>Fetch full attendance history</td></tr>
+      <tr><td><span class="badge badge-blue">POST</span></td><td><code>/api/v1/attendance/check-in</code></td><td>Record clock-in in Odoo</td></tr>
+      <tr><td><span class="badge badge-blue">POST</span></td><td><code>/api/v1/attendance/check-out</code></td><td>Record clock-out in Odoo</td></tr>
+    </tbody>
+  </table>
+
+  <hr/>
+
+  <p class="label">New files created this session</p>
+  <table>
+    <thead><tr><th>File</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>utils/api.ts</code></td><td>Central API client — auto Bearer token, silent 401 refresh</td></tr>
+      <tr><td><code>store/useAppStore.ts</code></td><td>Global state — auth, attendance, leaves, notifications, refreshData</td></tr>
+      <tr><td><code>app/login.tsx</code></td><td>Premium login screen</td></tr>
+      <tr><td><code>components/CalendarModal.tsx</code></td><td>Month-grid calendar + day detail sheet</td></tr>
+      <tr><td><code>components/DatePickerModal.tsx</code></td><td>Drum-style date picker</td></tr>
+      <tr><td><code>components/NotificationsModal.tsx</code></td><td>In-app notification center</td></tr>
+      <tr><td><code>app/(tabs)/index.tsx</code></td><td>Home screen — fully rewritten with live data</td></tr>
+      <tr><td><code>app/(tabs)/leaves.tsx</code></td><td>Leaves screen — fully rewritten with live data + date picker</td></tr>
+    </tbody>
+  </table>
+
+  <div style="margin-top:48px; text-align:center; color:var(--muted); font-size:12px; border-top:1px solid var(--border); padding-top:24px;">
+    Smart HR Mobile App · Phase 2 &amp; 3 Documentation · August 2026<br/>
+    Built with Expo + React Native · Connected to Odoo 17 via custom REST API
+  </div>
+</div>
+
+</body>
+</html>

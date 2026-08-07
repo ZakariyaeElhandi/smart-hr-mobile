@@ -14,7 +14,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { router } from 'expo-router';
 import { useAppStore } from '../../store/useAppStore';
 import { apiCheckIn, apiCheckOut } from '../../utils/api';
-import CalendarModal, { DayMark } from '../../components/CalendarModal';
+import CalendarModal, { DayMark, DayDetail } from '../../components/CalendarModal';
 import NotificationsModal from '../../components/NotificationsModal';
 
 export default function HomeScreen() {
@@ -50,10 +50,19 @@ export default function HomeScreen() {
       const hasAnomaly = !!a.anomaly_type;
       const noCheckout = !a.check_out;
       const isLate = a.is_late;
+      const detail: DayDetail = {
+        checkIn: a.check_in,
+        checkOut: a.check_out ?? undefined,
+        workedHours: a.worked_hours,
+        isLate: a.is_late,
+        lateMinutes: a.late_minutes,
+        anomalyType: a.anomaly_type,
+      };
       marks.push({
         date: dateStr,
         color: hasAnomaly || noCheckout ? '#ef4444' : isLate ? '#f59e0b' : '#10b981',
-        label: hasAnomaly ? 'Anomaly' : noCheckout ? 'No checkout' : isLate ? 'Late' : 'Present',
+        label: hasAnomaly ? 'Anomaly' : noCheckout ? 'No checkout' : isLate ? 'Late arrival' : 'Present',
+        detail,
       });
     });
     return marks;
@@ -123,7 +132,7 @@ export default function HomeScreen() {
             {/* Bell with badge */}
             <TouchableOpacity
               style={styles.bellWrapper}
-              onPress={() => { setShowNotifs(true); markNotificationsRead(); }}
+              onPress={() => setShowNotifs(true)}
             >
               <Bell color="#e2e8f0" size={22} />
               {unreadCount > 0 && (
@@ -171,16 +180,7 @@ export default function HomeScreen() {
       >
         {/* Clock In Section */}
         <View style={styles.section}>
-          <View style={styles.sectionRow}>
-            <Text style={styles.sectionTitle}>Attendance</Text>
-            <TouchableOpacity
-              style={styles.calendarPill}
-              onPress={() => setShowCalendar(true)}
-            >
-              <Calendar color="#6366f1" size={14} />
-              <Text style={styles.calendarPillText}>View Calendar</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.sectionTitle}>Attendance</Text>
           <View style={styles.clockCard}>
             <View style={styles.clockCardInner}>
               <View>
@@ -232,13 +232,19 @@ export default function HomeScreen() {
               <Calendar color="#3b82f6" size={28} />
               <Text style={[styles.actionLabel, { color: '#1d4ed8' }]}>Request{'\n'}Time Off</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionCard, { backgroundColor: '#f0fdf4' }]}>
+            <TouchableOpacity
+              style={[styles.actionCard, { backgroundColor: '#ede9fe' }]}
+              onPress={() => setShowCalendar(true)}
+            >
+              <CheckCircle color="#7c3aed" size={28} />
+              <Text style={[styles.actionLabel, { color: '#6d28d9' }]}>Attendance{'\n'}Calendar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionCard, { backgroundColor: '#f0fdf4' }]}
+              onPress={() => router.push('/(tabs)/performance')}
+            >
               <TrendingUp color="#16a34a" size={28} />
               <Text style={[styles.actionLabel, { color: '#15803d' }]}>View{'\n'}Performance</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionCard, { backgroundColor: '#fdf4ff' }]}>
-              <CheckCircle color="#9333ea" size={28} />
-              <Text style={[styles.actionLabel, { color: '#7e22ce' }]}>My{'\n'}Appraisals</Text>
             </TouchableOpacity>
           </View>
         </View>
