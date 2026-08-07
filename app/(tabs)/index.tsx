@@ -1,33 +1,56 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MapPin, Bell, Clock, CheckCircle, TrendingUp, Calendar } from 'lucide-react-native';
-import { useState } from 'react';
+import { MapPin, Bell, Clock, CheckCircle, TrendingUp, Calendar, LogOut } from 'lucide-react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { router } from 'expo-router';
 import { useAppStore } from '../../store/useAppStore';
-
-const { width } = Dimensions.get('window');
+import { apiCheckIn, apiCheckOut } from '../../utils/api';
 
 export default function HomeScreen() {
-  const { user, isClockedIn, toggleClockIn, leaveRequests } = useAppStore();
-  const [isCheckingGPS, setIsCheckingGPS] = useState(false);
+  const { user, isClockedIn, setClockedIn, logout, leaveRequests } = useAppStore();
+  const [isClockLoading, setIsClockLoading] = useState(false);
 
-  const approvedLeaves = leaveRequests.filter(r => r.status === 'Approved');
-  const pendingLeaves = leaveRequests.filter(r => r.status === 'Pending');
-
-  const handleClockIn = () => {
-    if (!isClockedIn) {
-      setIsCheckingGPS(true);
-      setTimeout(() => {
-        setIsCheckingGPS(false);
-        toggleClockIn();
-        Alert.alert('✅ Clocked In', 'GPS verified. You are at Casablanca HQ.');
-      }, 1800);
-    } else {
-      toggleClockIn();
-    }
-  };
+  const pendingLeaves = leaveRequests.filter(
+    (r) => r.status === 'Pending' || r.status === 'confirm'
+  );
 
   const now = new Date();
-  const greeting = now.getHours() < 12 ? 'Good Morning' : now.getHours() < 18 ? 'Good Afternoon' : 'Good Evening';
+  const greeting =
+    now.getHours() < 12
+      ? 'Good Morning'
+      : now.getHours() < 18
+      ? 'Good Afternoon'
+      : 'Good Evening';
+
+  const handleClockIn = useCallback(async () => {
+    setIsClockLoading(true);
+    try {
+      if (!isClockedIn) {
+        await apiCheckIn();
+        setClockedIn(true);
+        Alert.alert('✅ Clocked In', 'Your attendance has been recorded in Odoo.');
+      } else {
+        await apiCheckOut();
+        setClockedIn(false);
+        Alert.alert('👋 Clocked Out', 'Your session has been closed in Odoo.');
+      }
+    } catch (err: any) {
+      if (err.message === 'SESSION_EXPIRED') {
+        Alert.alert('Session expired', 'Please log in again.');
+        await logout();
+        router.replace('/login');
+        return;
+      }
+      Alert.alert('Error', err.message ?? 'Something went wrong.');
+    } finally {
+      setIsClockLoading(false);
+    }
+  }, [isClockedIn]);
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/login');
+  };
 
   return (
     <View style={styles.container}>
@@ -36,26 +59,33 @@ export default function HomeScreen() {
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.greeting}>{greeting},</Text>
-            <Text style={styles.userName}>{user.name} 👋</Text>
-            <Text style={styles.department}>{user.department}</Text>
+            <Text style={styles.userName}>{user.name || 'Employee'} 👋</Text>
+            <Text style={styles.department}>
+              {user.role ? user.role.toUpperCase() : 'Staff'}
+            </Text>
           </View>
-          <TouchableOpacity style={styles.bellWrapper}>
-            <Bell color="#e2e8f0" size={22} />
-            <View style={styles.notifDot} />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.bellWrapper}>
+              <Bell color="#e2e8f0" size={22} />
+              <View style={styles.notifDot} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+              <LogOut color="#e2e8f0" size={20} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Stats Row */}
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{user.vacationDaysLeft}</Text>
-            <Text style={styles.statLabel}>Days Off Left</Text>
-          </View>
-          <View style={[styles.statCard, styles.statCardMiddle]}>
             <Text style={[styles.statValue, isClockedIn ? styles.clockedInText : styles.clockedOutText]}>
               {isClockedIn ? 'Active' : 'Offline'}
             </Text>
             <Text style={styles.statLabel}>Status</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{leaveRequests.length}</Text>
+            <Text style={styles.statLabel}>Leave History</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{pendingLeaves.length}</Text>
@@ -76,23 +106,33 @@ export default function HomeScreen() {
                 </Text>
                 <View style={styles.locationRow}>
                   <MapPin color="#94a3b8" size={13} />
-                  <Text style={styles.locationText}>Casablanca HQ • GPS Required</Text>
+                  <Text style={styles.locationText}>Synced with Odoo Attendance</Text>
                 </View>
               </View>
               <TouchableOpacity
                 onPress={handleClockIn}
-                disabled={isCheckingGPS}
-                style={[styles.clockBtn, isClockedIn ? styles.clockBtnOut : styles.clockBtnIn, isCheckingGPS && styles.clockBtnLoading]}
+                disabled={isClockLoading}
+                style={[
+                  styles.clockBtn,
+                  isClockedIn ? styles.clockBtnOut : styles.clockBtnIn,
+                  isClockLoading && styles.clockBtnLoading,
+                ]}
               >
-                <Clock color="#fff" size={16} />
-                <Text style={styles.clockBtnText}>
-                  {isCheckingGPS ? 'Checking GPS...' : isClockedIn ? 'Clock Out' : 'Clock In'}
-                </Text>
+                {isClockLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Clock color="#fff" size={16} />
+                    <Text style={styles.clockBtnText}>
+                      {isClockedIn ? 'Clock Out' : 'Clock In'}
+                    </Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
             {isClockedIn && (
               <View style={styles.activeBar}>
-                <Text style={styles.activeBarText}>⏱  Session started — working hours tracking active</Text>
+                <Text style={styles.activeBarText}>⏱  Working hours tracking active — synced live to Odoo</Text>
               </View>
             )}
           </View>
@@ -102,7 +142,10 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.actionsGrid}>
-            <TouchableOpacity style={[styles.actionCard, { backgroundColor: '#eff6ff' }]}>
+            <TouchableOpacity
+              style={[styles.actionCard, { backgroundColor: '#eff6ff' }]}
+              onPress={() => router.push('/(tabs)/leaves')}
+            >
               <Calendar color="#3b82f6" size={28} />
               <Text style={[styles.actionLabel, { color: '#1d4ed8' }]}>Request{'\n'}Time Off</Text>
             </TouchableOpacity>
@@ -117,32 +160,36 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Notifications */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Notifications</Text>
-
-          <View style={styles.notifCard}>
-            <View style={[styles.notifIcon, { backgroundColor: '#dcfce7' }]}>
-              <CheckCircle color="#16a34a" size={20} />
-            </View>
-            <View style={styles.notifBody}>
-              <Text style={styles.notifTitle}>Leave Request Approved ✓</Text>
-              <Text style={styles.notifText}>Your summer vacation Aug 15–20 has been approved by your manager.</Text>
-              <Text style={styles.notifTime}>2 hours ago</Text>
-            </View>
+        {/* Recent Leaves */}
+        {leaveRequests.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Recent Leave Requests</Text>
+            {leaveRequests.slice(0, 3).map((req) => {
+              const isApproved = req.status === 'validate' || req.status === 'Approved';
+              const isPending = req.status === 'confirm' || req.status === 'Pending';
+              const bgColor = isApproved ? '#dcfce7' : isPending ? '#fef9c3' : '#fee2e2';
+              const txtColor = isApproved ? '#15803d' : isPending ? '#92400e' : '#b91c1c';
+              const label = isApproved ? 'Approved' : isPending ? 'Pending' : 'Refused';
+              return (
+                <View key={req.id} style={styles.notifCard}>
+                  <View style={[styles.notifIcon, { backgroundColor: bgColor }]}>
+                    {isApproved
+                      ? <CheckCircle color="#16a34a" size={20} />
+                      : isPending
+                      ? <Clock color="#d97706" size={20} />
+                      : <Bell color="#dc2626" size={20} />
+                    }
+                  </View>
+                  <View style={styles.notifBody}>
+                    <Text style={styles.notifTitle}>{req.reason || req.leaveType || 'Leave Request'}</Text>
+                    <Text style={styles.notifText}>{req.startDate} → {req.endDate}</Text>
+                    <Text style={[styles.notifTime, { color: txtColor, fontWeight: '700' }]}>{label}</Text>
+                  </View>
+                </View>
+              );
+            })}
           </View>
-
-          <View style={styles.notifCard}>
-            <View style={[styles.notifIcon, { backgroundColor: '#fef9c3' }]}>
-              <Bell color="#ca8a04" size={20} />
-            </View>
-            <View style={styles.notifBody}>
-              <Text style={styles.notifTitle}>Performance Review Due</Text>
-              <Text style={styles.notifText}>Your Q3 self-evaluation is due in 5 days. Tap to complete.</Text>
-              <Text style={styles.notifTime}>Yesterday</Text>
-            </View>
-          </View>
-        </View>
+        )}
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -157,11 +204,12 @@ const styles = StyleSheet.create({
   greeting: { color: '#94a3b8', fontSize: 15, fontWeight: '500' },
   userName: { color: '#f1f5f9', fontSize: 28, fontWeight: '800', marginTop: 2 },
   department: { color: '#64748b', fontSize: 13, marginTop: 4 },
+  headerActions: { flexDirection: 'row', gap: 10 },
   bellWrapper: { backgroundColor: 'rgba(255,255,255,0.08)', padding: 12, borderRadius: 14, position: 'relative' },
   notifDot: { width: 9, height: 9, backgroundColor: '#ef4444', borderRadius: 99, position: 'absolute', top: 10, right: 10, borderWidth: 1.5, borderColor: '#16213e' },
+  logoutBtn: { backgroundColor: 'rgba(255,255,255,0.08)', padding: 12, borderRadius: 14 },
   statsRow: { flexDirection: 'row', gap: 12 },
   statCard: { flex: 1, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 16, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  statCardMiddle: {},
   statValue: { color: '#f1f5f9', fontSize: 22, fontWeight: '800' },
   statLabel: { color: '#64748b', fontSize: 11, marginTop: 4, textAlign: 'center' },
   clockedInText: { color: '#4ade80' },
@@ -174,7 +222,7 @@ const styles = StyleSheet.create({
   clockTitle: { fontSize: 15, fontWeight: '700', color: '#0f172a', marginBottom: 6 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   locationText: { color: '#94a3b8', fontSize: 12 },
-  clockBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 18, borderRadius: 14 },
+  clockBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 18, borderRadius: 14, minWidth: 110, justifyContent: 'center' },
   clockBtnIn: { backgroundColor: '#10b981' },
   clockBtnOut: { backgroundColor: '#ef4444' },
   clockBtnLoading: { opacity: 0.65 },
