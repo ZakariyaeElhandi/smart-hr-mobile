@@ -133,3 +133,21 @@ export async function apiCheckOut() {
   }
   return res.json();
 }
+
+export async function apiGetAttendances(employeeId: number) {
+  const res = await apiFetch(`/api/v1/attendance/${employeeId}`);
+  if (!res.ok) throw new Error('Failed to fetch attendances');
+  return res.json() as Promise<AttendanceRecord[]>;
+}
+
+export interface AttendanceRecord {
+  id: number;
+  employee_id: number;
+  employee: string;
+  check_in: string | null;
+  check_out: string | null;
+  worked_hours: number;
+  is_late: boolean;
+  late_minutes: number;
+  anomaly_type: string | null;
+}

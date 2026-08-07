@@ -1,14 +1,35 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MapPin, Bell, Clock, CheckCircle, TrendingUp, Calendar, LogOut } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { router } from 'expo-router';
 import { useAppStore } from '../../store/useAppStore';
 import { apiCheckIn, apiCheckOut } from '../../utils/api';
+import CalendarModal, { DayMark } from '../../components/CalendarModal';
+import NotificationsModal from '../../components/NotificationsModal';
 
 export default function HomeScreen() {
-  const { user, isClockedIn, setClockedIn, logout, leaveRequests } = useAppStore();
+  const {
+    user, isClockedIn, setClockedIn, logout,
+    leaveRequests, attendances, notifications,
+    refreshData, markNotificationsRead,
+  } = useAppStore();
+
   const [isClockLoading, setIsClockLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [showNotifs, setShowNotifs] = useState(false);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   const pendingLeaves = leaveRequests.filter(
     (r) => r.status === 'Pending' || r.status === 'confirm'
@@ -16,11 +37,27 @@ export default function HomeScreen() {
 
   const now = new Date();
   const greeting =
-    now.getHours() < 12
-      ? 'Good Morning'
-      : now.getHours() < 18
-      ? 'Good Afternoon'
-      : 'Good Evening';
+    now.getHours() < 12 ? 'Good Morning'
+    : now.getHours() < 18 ? 'Good Afternoon'
+    : 'Good Evening';
+
+  // Build attendance calendar marks
+  const attendanceMarks = useMemo<DayMark[]>(() => {
+    const marks: DayMark[] = [];
+    attendances.forEach((a) => {
+      if (!a.check_in) return;
+      const dateStr = a.check_in.split('T')[0];
+      const hasAnomaly = !!a.anomaly_type;
+      const noCheckout = !a.check_out;
+      const isLate = a.is_late;
+      marks.push({
+        date: dateStr,
+        color: hasAnomaly || noCheckout ? '#ef4444' : isLate ? '#f59e0b' : '#10b981',
+        label: hasAnomaly ? 'Anomaly' : noCheckout ? 'No checkout' : isLate ? 'Late' : 'Present',
+      });
+    });
+    return marks;
+  }, [attendances]);
 
   const handleClockIn = useCallback(async () => {
     setIsClockLoading(true);
@@ -34,6 +71,8 @@ export default function HomeScreen() {
         setClockedIn(false);
         Alert.alert('👋 Clocked Out', 'Your session has been closed in Odoo.');
       }
+      // Refresh attendance data after clocking
+      refreshData();
     } catch (err: any) {
       if (err.message === 'SESSION_EXPIRED') {
         Alert.alert('Session expired', 'Please log in again.');
@@ -47,10 +86,26 @@ export default function HomeScreen() {
     }
   }, [isClockedIn]);
 
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshData();
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refreshData]);
+
   const handleLogout = async () => {
     await logout();
     router.replace('/login');
   };
+
+  // Today's attendance summary
+  const todayStr = now.toISOString().split('T')[0];
+  const todayRecord = attendances.find((a) => a.check_in?.startsWith(todayStr));
+  const workedTodayHrs = todayRecord?.worked_hours
+    ? `${Math.floor(todayRecord.worked_hours)}h${Math.round((todayRecord.worked_hours % 1) * 60)}m`
+    : isClockedIn ? 'Active' : '—';
 
   return (
     <View style={styles.container}>
@@ -65,9 +120,17 @@ export default function HomeScreen() {
             </Text>
           </View>
           <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.bellWrapper}>
+            {/* Bell with badge */}
+            <TouchableOpacity
+              style={styles.bellWrapper}
+              onPress={() => { setShowNotifs(true); markNotificationsRead(); }}
+            >
               <Bell color="#e2e8f0" size={22} />
-              <View style={styles.notifDot} />
+              {unreadCount > 0 && (
+                <View style={styles.notifDot}>
+                  <Text style={styles.notifDotText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
             <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
               <LogOut color="#e2e8f0" size={20} />
@@ -84,8 +147,8 @@ export default function HomeScreen() {
             <Text style={styles.statLabel}>Status</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{leaveRequests.length}</Text>
-            <Text style={styles.statLabel}>Leave History</Text>
+            <Text style={styles.statValue}>{workedTodayHrs}</Text>
+            <Text style={styles.statLabel}>Today</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{pendingLeaves.length}</Text>
@@ -94,10 +157,30 @@ export default function HomeScreen() {
         </View>
       </LinearGradient>
 
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor="#6366f1"
+            colors={['#6366f1']}
+          />
+        }
+      >
         {/* Clock In Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Attendance</Text>
+          <View style={styles.sectionRow}>
+            <Text style={styles.sectionTitle}>Attendance</Text>
+            <TouchableOpacity
+              style={styles.calendarPill}
+              onPress={() => setShowCalendar(true)}
+            >
+              <Calendar color="#6366f1" size={14} />
+              <Text style={styles.calendarPillText}>View Calendar</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.clockCard}>
             <View style={styles.clockCardInner}>
               <View>
@@ -181,7 +264,7 @@ export default function HomeScreen() {
                     }
                   </View>
                   <View style={styles.notifBody}>
-                    <Text style={styles.notifTitle}>{req.reason || req.leaveType || 'Leave Request'}</Text>
+                    <Text style={styles.notifTitle}>{req.leaveType || req.reason || 'Leave Request'}</Text>
                     <Text style={styles.notifText}>{req.startDate} → {req.endDate}</Text>
                     <Text style={[styles.notifTime, { color: txtColor, fontWeight: '700' }]}>{label}</Text>
                   </View>
@@ -193,6 +276,27 @@ export default function HomeScreen() {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Attendance Calendar Modal */}
+      <CalendarModal
+        visible={showCalendar}
+        onClose={() => setShowCalendar(false)}
+        title="Attendance Calendar"
+        marks={attendanceMarks}
+        legend={[
+          { color: '#10b981', label: 'Present' },
+          { color: '#f59e0b', label: 'Late arrival' },
+          { color: '#ef4444', label: 'Issue / No checkout' },
+        ]}
+      />
+
+      {/* Notifications Modal */}
+      <NotificationsModal
+        visible={showNotifs}
+        onClose={() => setShowNotifs(false)}
+        notifications={notifications}
+        onMarkRead={markNotificationsRead}
+      />
     </View>
   );
 }
@@ -206,17 +310,29 @@ const styles = StyleSheet.create({
   department: { color: '#64748b', fontSize: 13, marginTop: 4 },
   headerActions: { flexDirection: 'row', gap: 10 },
   bellWrapper: { backgroundColor: 'rgba(255,255,255,0.08)', padding: 12, borderRadius: 14, position: 'relative' },
-  notifDot: { width: 9, height: 9, backgroundColor: '#ef4444', borderRadius: 99, position: 'absolute', top: 10, right: 10, borderWidth: 1.5, borderColor: '#16213e' },
+  notifDot: {
+    minWidth: 16, height: 16,
+    backgroundColor: '#ef4444',
+    borderRadius: 99,
+    position: 'absolute', top: 7, right: 7,
+    borderWidth: 1.5, borderColor: '#16213e',
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  notifDotText: { color: '#fff', fontSize: 9, fontWeight: '800' },
   logoutBtn: { backgroundColor: 'rgba(255,255,255,0.08)', padding: 12, borderRadius: 14 },
   statsRow: { flexDirection: 'row', gap: 12 },
   statCard: { flex: 1, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 16, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  statValue: { color: '#f1f5f9', fontSize: 22, fontWeight: '800' },
+  statValue: { color: '#f1f5f9', fontSize: 20, fontWeight: '800' },
   statLabel: { color: '#64748b', fontSize: 11, marginTop: 4, textAlign: 'center' },
   clockedInText: { color: '#4ade80' },
   clockedOutText: { color: '#94a3b8' },
   scroll: { flex: 1 },
   section: { paddingHorizontal: 20, marginTop: 24 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#0f172a', marginBottom: 12 },
+  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#0f172a' },
+  calendarPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#ede9fe', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99 },
+  calendarPillText: { fontSize: 12, fontWeight: '700', color: '#6366f1' },
   clockCard: { backgroundColor: '#ffffff', borderRadius: 20, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 3 },
   clockCardInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20 },
   clockTitle: { fontSize: 15, fontWeight: '700', color: '#0f172a', marginBottom: 6 },

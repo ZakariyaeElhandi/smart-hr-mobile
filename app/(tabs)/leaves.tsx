@@ -1,14 +1,16 @@
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Modal, ActivityIndicator,
+  StyleSheet, Alert, Modal, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Plane, CheckCircle, XCircle, Clock, Plus, X, AlertTriangle } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { Plane, CheckCircle, XCircle, Clock, Plus, X, AlertTriangle, Calendar } from 'lucide-react-native';
+import { useCallback, useMemo, useState } from 'react';
 import type React from 'react';
 import { router } from 'expo-router';
 import { useAppStore, LeaveRequest } from '../../store/useAppStore';
-import { apiGetLeaves, apiCreateLeave } from '../../utils/api';
+import { apiCreateLeave } from '../../utils/api';
+import CalendarModal, { DayMark } from '../../components/CalendarModal';
+import DatePickerModal from '../../components/DatePickerModal';
 
 // Map Odoo states → display-friendly status
 function mapStatus(state: string): 'Approved' | 'Pending' | 'Denied' {
@@ -23,53 +25,52 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; icon: React.Reac
   Pending:  { bg: '#fef9c3', text: '#92400e', icon: <Clock color="#d97706" size={18} /> },
 };
 
-// Odoo leave type IDs — update these to match your actual Odoo database
-// You can find them in Odoo > Time Off > Configuration > Leave Types
+// Odoo leave type IDs — queried directly from the DB
 const LEAVE_TYPE_IDS: Record<string, number> = {
   'Annual': 1,
   'Sick':   2,
-  'Personal': 3,
+  'Personal': 4,
 };
 
+function dateToStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function daysBetween(start: Date, end: Date): number {
+  const diff = end.getTime() - start.getTime();
+  return Math.max(1, Math.round(diff / (1000 * 60 * 60 * 24)) + 1);
+}
+
 export default function LeavesScreen() {
-  const { logout, setLeaveRequests, addLeaveRequest, leaveRequests } = useAppStore();
-  const [isLoading, setIsLoading] = useState(true);
+  const { logout, setLeaveRequests, addLeaveRequest, leaveRequests, refreshData } = useAppStore();
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [showCalendar, setShowCalendar] = useState(false);
+
+  // Date picker state
+  const today = new Date();
+  const [startDate, setStartDate] = useState<Date>(today);
+  const [endDate, setEndDate] = useState<Date>(today);
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+
   const [reason, setReason] = useState('');
   const [type, setType] = useState<'Annual' | 'Sick' | 'Personal'>('Annual');
 
-  const fetchLeaves = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await apiGetLeaves();
-      const mapped: LeaveRequest[] = data.map((l: any) => ({
-        id: l.id,
-        startDate: l.date_from ? l.date_from.split('T')[0] : '',
-        endDate:   l.date_to   ? l.date_to.split('T')[0]   : '',
-        reason:    l.holiday_status ?? '',
-        leaveType: l.holiday_status,
-        status:    l.state,
-        aiRecommendation: l.ai_recommendation,
-      }));
-      setLeaveRequests(mapped);
-    } catch (err: any) {
-      if (err.message === 'SESSION_EXPIRED') {
-        await logout();
-        router.replace('/login');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchLeaves(); }, []);
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try { await refreshData(); }
+    finally { setIsRefreshing(false); }
+  }, [refreshData]);
 
   const handleSubmit = async () => {
-    if (!startDate || !endDate || !reason) {
-      Alert.alert('Missing Fields', 'Please fill in all fields before submitting.');
+    if (!reason) {
+      Alert.alert('Missing Fields', 'Please add a reason for your leave request.');
+      return;
+    }
+    if (endDate < startDate) {
+      Alert.alert('Invalid Dates', 'End date must be on or after the start date.');
       return;
     }
     setIsSubmitting(true);
@@ -77,26 +78,26 @@ export default function LeavesScreen() {
       const leaveTypeId = LEAVE_TYPE_IDS[type];
       const created = await apiCreateLeave({
         holiday_status_id: leaveTypeId,
-        date_from: startDate,
-        date_to: endDate,
+        date_from: dateToStr(startDate),
+        date_to:   dateToStr(endDate),
         reason,
       });
       const newReq: LeaveRequest = {
         id: created.id,
-        startDate: created.date_from?.split('T')[0] ?? startDate,
-        endDate:   created.date_to?.split('T')[0]   ?? endDate,
+        startDate: created.date_from?.split('T')[0] ?? dateToStr(startDate),
+        endDate:   created.date_to?.split('T')[0]   ?? dateToStr(endDate),
         reason,
         leaveType: type,
         status: created.state ?? 'confirm',
+        numberOfDays: created.number_of_days,
         aiRecommendation: created.ai_recommendation,
       };
       addLeaveRequest(newReq);
       setShowModal(false);
-      setStartDate(''); setEndDate(''); setReason('');
+      setReason('');
 
       const aiMsg = created.ai_recommendation
-        ? `\n\nAI Recommendation: ${created.ai_recommendation}`
-        : '';
+        ? `\n\nAI Recommendation: ${created.ai_recommendation}` : '';
       Alert.alert('✅ Request Submitted', `Your leave request has been sent to Odoo.${aiMsg}`);
     } catch (err: any) {
       if (err.message === 'SESSION_EXPIRED') {
@@ -116,6 +117,29 @@ export default function LeavesScreen() {
   const pendingCount = leaveRequests.filter(
     (r) => r.status === 'confirm' || r.status === 'Pending'
   ).length;
+
+  // Build calendar marks from leave requests
+  const leaveMarks = useMemo<DayMark[]>(() => {
+    const marks: DayMark[] = [];
+    leaveRequests.forEach((req) => {
+      if (!req.startDate || !req.endDate) return;
+      const isApproved = req.status === 'validate' || req.status === 'Approved';
+      const isRefused  = req.status === 'refuse'   || req.status === 'Denied';
+      const color      = isApproved ? '#10b981' : isRefused ? '#ef4444' : '#f59e0b';
+
+      // Mark every day in the range
+      const start = new Date(req.startDate);
+      const end   = new Date(req.endDate);
+      const cur   = new Date(start);
+      while (cur <= end) {
+        marks.push({ date: dateToStr(cur), color, label: req.leaveType });
+        cur.setDate(cur.getDate() + 1);
+      }
+    });
+    return marks;
+  }, [leaveRequests]);
+
+  const daysRequested = daysBetween(startDate, endDate);
 
   return (
     <View style={styles.container}>
@@ -149,23 +173,37 @@ export default function LeavesScreen() {
         </View>
       </LinearGradient>
 
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* New Request Button */}
+      <ScrollView
+        style={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor="#6366f1"
+            colors={['#6366f1']}
+          />
+        }
+      >
+        {/* Action Buttons */}
         <View style={styles.section}>
-          <TouchableOpacity style={styles.newRequestBtn} onPress={() => setShowModal(true)}>
-            <LinearGradient colors={['#4f46e5', '#7c3aed']} style={styles.newRequestGrad}>
-              <Plus color="#fff" size={20} />
-              <Text style={styles.newRequestText}>Request New Time Off</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.newRequestBtn} onPress={() => setShowModal(true)}>
+              <LinearGradient colors={['#4f46e5', '#7c3aed']} style={styles.newRequestGrad}>
+                <Plus color="#fff" size={20} />
+                <Text style={styles.newRequestText}>Request Time Off</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.calBtn} onPress={() => setShowCalendar(true)}>
+              <Calendar color="#4f46e5" size={22} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Requests List */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>All Requests</Text>
-          {isLoading ? (
-            <ActivityIndicator color="#4f46e5" size="large" style={{ marginTop: 20 }} />
-          ) : leaveRequests.length === 0 ? (
+          {leaveRequests.length === 0 ? (
             <View style={styles.emptyState}>
               <Plane color="#cbd5e1" size={48} />
               <Text style={styles.emptyText}>No leave requests yet</Text>
@@ -181,8 +219,11 @@ export default function LeavesScreen() {
                     {s.icon}
                   </View>
                   <View style={styles.reqBody}>
-                    <Text style={styles.reqReason}>{req.reason || req.leaveType || 'Leave'}</Text>
-                    <Text style={styles.reqDates}>{req.startDate} → {req.endDate}</Text>
+                    <Text style={styles.reqReason}>{req.leaveType || req.reason || 'Leave'}</Text>
+                    <Text style={styles.reqDates}>
+                      {req.startDate} → {req.endDate}
+                      {req.numberOfDays ? `  (${req.numberOfDays}d)` : ''}
+                    </Text>
                     {req.aiRecommendation && (
                       <View style={styles.aiBadge}>
                         <AlertTriangle color="#d97706" size={12} />
@@ -201,17 +242,51 @@ export default function LeavesScreen() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Modal */}
+      {/* Leave Calendar Modal */}
+      <CalendarModal
+        visible={showCalendar}
+        onClose={() => setShowCalendar(false)}
+        title="Leave Calendar"
+        marks={leaveMarks}
+        legend={[
+          { color: '#10b981', label: 'Approved' },
+          { color: '#f59e0b', label: 'Pending' },
+          { color: '#ef4444', label: 'Refused' },
+        ]}
+      />
+
+      {/* Date Pickers */}
+      <DatePickerModal
+        visible={showStartPicker}
+        onClose={() => setShowStartPicker(false)}
+        label="Start Date"
+        value={startDate}
+        onChange={(d) => {
+          setStartDate(d);
+          if (d > endDate) setEndDate(d);
+        }}
+      />
+      <DatePickerModal
+        visible={showEndPicker}
+        onClose={() => setShowEndPicker(false)}
+        label="End Date"
+        value={endDate}
+        onChange={setEndDate}
+        minimumDate={startDate}
+      />
+
+      {/* Request Modal */}
       <Modal visible={showModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>New Leave Request</Text>
-              <TouchableOpacity onPress={() => setShowModal(false)}>
-                <X color="#64748b" size={24} />
+              <TouchableOpacity onPress={() => setShowModal(false)} style={styles.modalClose}>
+                <X color="#64748b" size={22} />
               </TouchableOpacity>
             </View>
 
+            {/* Type Chips */}
             <Text style={styles.fieldLabel}>Leave Type</Text>
             <View style={styles.typeRow}>
               {(['Annual', 'Sick', 'Personal'] as const).map((t) => (
@@ -225,24 +300,27 @@ export default function LeavesScreen() {
               ))}
             </View>
 
+            {/* Date pickers */}
             <Text style={styles.fieldLabel}>Start Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor="#94a3b8"
-              value={startDate}
-              onChangeText={setStartDate}
-            />
+            <TouchableOpacity style={styles.dateField} onPress={() => setShowStartPicker(true)}>
+              <Calendar color="#6366f1" size={16} />
+              <Text style={styles.dateFieldText}>{dateToStr(startDate)}</Text>
+            </TouchableOpacity>
 
             <Text style={styles.fieldLabel}>End Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor="#94a3b8"
-              value={endDate}
-              onChangeText={setEndDate}
-            />
+            <TouchableOpacity style={styles.dateField} onPress={() => setShowEndPicker(true)}>
+              <Calendar color="#6366f1" size={16} />
+              <Text style={styles.dateFieldText}>{dateToStr(endDate)}</Text>
+            </TouchableOpacity>
 
+            {/* Days count preview */}
+            <View style={styles.daysBadge}>
+              <Text style={styles.daysBadgeText}>
+                {daysRequested} day{daysRequested !== 1 ? 's' : ''} requested
+              </Text>
+            </View>
+
+            {/* Reason */}
             <Text style={styles.fieldLabel}>Reason</Text>
             <TextInput
               style={[styles.input, styles.inputMulti]}
@@ -258,10 +336,12 @@ export default function LeavesScreen() {
                 {isSubmitting ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.submitBtnText}>Submit Request to Odoo</Text>
+                  <Text style={styles.submitBtnText}>Submit to Odoo</Text>
                 )}
               </LinearGradient>
             </TouchableOpacity>
+
+            <View style={{ height: 12 }} />
           </View>
         </View>
       </Modal>
@@ -286,9 +366,11 @@ const styles = StyleSheet.create({
   scroll: { flex: 1, marginTop: -60 },
   section: { paddingHorizontal: 20, marginTop: 16 },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: '#0f172a', marginBottom: 12 },
-  newRequestBtn: { borderRadius: 16, overflow: 'hidden' },
+  actionRow: { flexDirection: 'row', gap: 12 },
+  newRequestBtn: { flex: 1, borderRadius: 16, overflow: 'hidden' },
   newRequestGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16 },
-  newRequestText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  newRequestText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  calBtn: { backgroundColor: '#fff', width: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 },
   emptyState: { alignItems: 'center', paddingVertical: 48 },
   emptyText: { color: '#64748b', fontSize: 16, fontWeight: '700', marginTop: 16 },
   emptySubtext: { color: '#94a3b8', fontSize: 13, marginTop: 6 },
@@ -301,18 +383,24 @@ const styles = StyleSheet.create({
   aiText: { fontSize: 11, color: '#d97706', fontWeight: '600' },
   reqBadge: { borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4 },
   reqBadgeText: { fontSize: 11, fontWeight: '700' },
+  // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalCard: { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 20, fontWeight: '800', color: '#0f172a' },
+  modalClose: { backgroundColor: '#f1f5f9', padding: 8, borderRadius: 99 },
   fieldLabel: { fontSize: 13, fontWeight: '700', color: '#475569', marginBottom: 8, marginTop: 14 },
   typeRow: { flexDirection: 'row', gap: 10 },
   typeChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 99, backgroundColor: '#f1f5f9', borderWidth: 1.5, borderColor: '#e2e8f0' },
   typeChipActive: { backgroundColor: '#ede9fe', borderColor: '#7c3aed' },
   typeChipText: { color: '#64748b', fontWeight: '600', fontSize: 13 },
   typeChipTextActive: { color: '#7c3aed' },
+  dateField: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f8fafc', borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 12, padding: 14 },
+  dateFieldText: { fontSize: 15, color: '#0f172a', fontWeight: '600' },
+  daysBadge: { backgroundColor: '#ede9fe', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14, alignSelf: 'flex-start', marginTop: 10 },
+  daysBadgeText: { color: '#6d28d9', fontWeight: '700', fontSize: 13 },
   input: { backgroundColor: '#f8fafc', borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 12, padding: 14, fontSize: 14, color: '#0f172a' },
-  inputMulti: { height: 90, textAlignVertical: 'top' },
+  inputMulti: { height: 80, textAlignVertical: 'top' },
   submitBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 20 },
   submitBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 });
