@@ -151,3 +151,28 @@ export interface AttendanceRecord {
   late_minutes: number;
   anomaly_type: string | null;
 }
+
+// ─── Appraisals helpers ───────────────────────────────────────────────────────
+export interface AppraisalRecord {
+  id: number;
+  employee_id: number;
+  employee: string;
+  state: string;
+  ai_performance_score: number;
+  ai_high_potential: boolean;
+  // Only present in detailed calls
+  ai_summary?: string;
+  ai_computed_on?: string | null;
+}
+
+export async function apiGetAppraisals(employeeId: number): Promise<AppraisalRecord[]> {
+  const res = await apiFetch(`/api/v1/appraisals/${employeeId}`);
+  if (!res.ok) throw new Error('Failed to fetch appraisals');
+  return res.json();
+}
+
+export async function apiGetAppraisalAnalysis(appraisalId: number): Promise<AppraisalRecord> {
+  const res = await apiFetch(`/api/v1/appraisals/${appraisalId}/analysis`);
+  if (!res.ok) throw new Error('Failed to fetch appraisal analysis');
+  return res.json();
+}

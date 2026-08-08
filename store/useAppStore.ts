@@ -4,10 +4,13 @@ import {
   ACCESS_TOKEN_KEY,
   REFRESH_TOKEN_KEY,
   AttendanceRecord,
+  AppraisalRecord,
   apiGetMe,
   apiLogin,
   apiGetLeaves,
   apiGetAttendances,
+  apiGetAppraisals,
+  apiGetAppraisalAnalysis,
 } from '../utils/api';
 
 export interface LeaveRequest {
@@ -54,8 +57,9 @@ interface AppState {
   // Notifications (in-app)
   notifications: Notification[];
 
-  // Performance (still mock until appraisal API is ready)
-  performanceScore: number;
+  // Appraisals / Performance (live from Odoo)
+  appraisals: AppraisalRecord[];
+  appraisalDetail: AppraisalRecord | null; // latest appraisal with AI summary
 
   // Actions
   login: (email: string, password: string) => Promise<void>;
@@ -119,7 +123,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   attendances: [],
   leaveRequests: [],
   notifications: [],
-  performanceScore: 92,
+  appraisals: [],
+  appraisalDetail: null,
 
   login: async (email, password) => {
     set({ isAuthLoading: true, authError: null });
@@ -156,6 +161,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       leaveRequests: [],
       attendances: [],
       notifications: [],
+      appraisals: [],
+      appraisalDetail: null,
       isClockedIn: false,
     });
   },
@@ -211,9 +218,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (user.employeeId) {
       try {
         const records = await apiGetAttendances(user.employeeId);
-        // Check if currently clocked in (last record has no check_out)
         const isClockedIn = records.length > 0 && !records[0].check_out;
         set({ attendances: records, isClockedIn });
+      } catch (_) {}
+
+      // Fetch appraisals + AI analysis for latest one
+      try {
+        const appraisals = await apiGetAppraisals(user.employeeId);
+        set({ appraisals });
+        if (appraisals.length > 0) {
+          const detail = await apiGetAppraisalAnalysis(appraisals[0].id);
+          set({ appraisalDetail: detail });
+        }
       } catch (_) {}
     }
   },
