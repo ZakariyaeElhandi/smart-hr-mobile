@@ -1,167 +1,299 @@
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
-  Alert,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MapPin, Bell, Clock, CheckCircle, TrendingUp, Calendar, LogOut } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Calendar as CalendarIcon,
+  Bell,
+  LogOut,
+  FileText,
+  Info,
+} from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAppStore } from '../../store/useAppStore';
-import { apiCheckIn, apiCheckOut } from '../../utils/api';
-import CalendarModal, { DayMark, DayDetail } from '../../components/CalendarModal';
+import DayDetailModal, { DayDetailData } from '../../components/DayDetailModal';
+import AnomalyModal from '../../components/AnomalyModal';
 import NotificationsModal from '../../components/NotificationsModal';
 
-export default function HomeScreen() {
+const MONTHS_FR = [
+  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+];
+
+const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+
+export default function MaPresenceScreen() {
   const {
-    user, isClockedIn, setClockedIn, logout,
-    leaveRequests, attendances, notifications,
-    refreshData, markNotificationsRead,
+    user,
+    logout,
+    monthlyAttendance,
+    selectedMonth,
+    selectedYear,
+    isMonthlyLoading,
+    fetchMonthlyAttendance,
+    notifications,
+    markNotificationsRead,
+    myAnomalies,
   } = useAppStore();
 
-  const [isClockLoading, setIsClockLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showCalendar, setShowCalendar] = useState(false);
+  const [selectedDayDetail, setSelectedDayDetail] = useState<DayDetailData | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showAnomalyModal, setShowAnomalyModal] = useState(false);
+  const [anomalyInitialDate, setAnomalyInitialDate] = useState<string | undefined>();
   const [showNotifs, setShowNotifs] = useState(false);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
-
-  const pendingLeaves = leaveRequests.filter(
-    (r) => r.status === 'Pending' || r.status === 'confirm'
-  );
+  const pendingAnomaliesCount = myAnomalies.filter((a) => a.status === 'pending').length;
 
   const now = new Date();
-  const greeting =
-    now.getHours() < 12 ? 'Good Morning'
-    : now.getHours() < 18 ? 'Good Afternoon'
-    : 'Good Evening';
+  const currentRealMonth = now.getMonth() + 1;
+  const currentRealYear = now.getFullYear();
 
-  // Build attendance calendar marks
-  const attendanceMarks = useMemo<DayMark[]>(() => {
-    const marks: DayMark[] = [];
-    attendances.forEach((a) => {
-      if (!a.check_in) return;
-      const dateStr = a.check_in.split('T')[0];
-      const hasAnomaly = !!a.anomaly_type;
-      const noCheckout = !a.check_out;
-      const isLate = a.is_late;
-      const detail: DayDetail = {
-        checkIn: a.check_in,
-        checkOut: a.check_out ?? undefined,
-        workedHours: a.worked_hours,
-        isLate: a.is_late,
-        lateMinutes: a.late_minutes,
-        anomalyType: a.anomaly_type,
-      };
-      marks.push({
-        date: dateStr,
-        color: hasAnomaly || noCheckout ? '#ef4444' : isLate ? '#f59e0b' : '#10b981',
-        label: hasAnomaly ? 'Anomaly' : noCheckout ? 'No checkout' : isLate ? 'Late arrival' : 'Present',
-        detail,
-      });
-    });
-    return marks;
-  }, [attendances]);
+  // Load monthly data on mount or when month/year changes
+  useEffect(() => {
+    fetchMonthlyAttendance(selectedMonth, selectedYear);
+  }, [selectedMonth, selectedYear]);
 
-  const handleClockIn = useCallback(async () => {
-    setIsClockLoading(true);
-    try {
-      if (!isClockedIn) {
-        await apiCheckIn();
-        setClockedIn(true);
-        Alert.alert('✅ Clocked In', 'Your attendance has been recorded in Odoo.');
-      } else {
-        await apiCheckOut();
-        setClockedIn(false);
-        Alert.alert('👋 Clocked Out', 'Your session has been closed in Odoo.');
-      }
-      // Refresh attendance data after clocking
-      refreshData();
-    } catch (err: any) {
-      if (err.message === 'SESSION_EXPIRED') {
-        Alert.alert('Session expired', 'Please log in again.');
-        await logout();
-        router.replace('/login');
-        return;
-      }
-      Alert.alert('Error', err.message ?? 'Something went wrong.');
-    } finally {
-      setIsClockLoading(false);
+  const handlePrevMonth = () => {
+    if (selectedMonth === 1) {
+      fetchMonthlyAttendance(12, selectedYear - 1);
+    } else {
+      fetchMonthlyAttendance(selectedMonth - 1, selectedYear);
     }
-  }, [isClockedIn]);
+  };
+
+  const handleNextMonth = () => {
+    if (selectedMonth === 12) {
+      fetchMonthlyAttendance(1, selectedYear + 1);
+    } else {
+      fetchMonthlyAttendance(selectedMonth + 1, selectedYear);
+    }
+  };
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      await refreshData();
+      await fetchMonthlyAttendance(selectedMonth, selectedYear);
     } finally {
       setIsRefreshing(false);
     }
-  }, [refreshData]);
+  }, [selectedMonth, selectedYear]);
 
   const handleLogout = async () => {
     await logout();
     router.replace('/login');
   };
 
-  // Today's attendance summary
-  const todayStr = now.toISOString().split('T')[0];
-  const todayRecord = attendances.find((a) => a.check_in?.startsWith(todayStr));
-  const workedTodayHrs = todayRecord?.worked_hours
-    ? `${Math.floor(todayRecord.worked_hours)}h${Math.round((todayRecord.worked_hours % 1) * 60)}m`
-    : isClockedIn ? 'Active' : '—';
+  // Build daily status map for the calendar grid
+  const calendarDays = useMemo(() => {
+    const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+    // In JS getDay(): 0 is Sun, 1 is Mon... convert to Monday-based index (0=Mon, 6=Sun)
+    const firstDayObj = new Date(selectedYear, selectedMonth - 1, 1);
+    let startDayOfWeek = firstDayObj.getDay() - 1;
+    if (startDayOfWeek === -1) startDayOfWeek = 6; // Sunday becomes 6
+
+    const attendances = monthlyAttendance?.attendances || [];
+    const leaves = monthlyAttendance?.leaves || [];
+    const anomalies = monthlyAttendance?.anomalies || [];
+
+    // Map check-ins by date string YYYY-MM-DD
+    const attMap: Record<string, any> = {};
+    attendances.forEach((a) => {
+      if (a.check_in) {
+        const dateStr = a.check_in.split('T')[0];
+        attMap[dateStr] = a;
+      }
+    });
+
+    // Map leaves by date string
+    const leaveSet = new Set<string>();
+    leaves.forEach((l) => {
+      if (l.date_from && l.date_to) {
+        const cur = new Date(l.date_from);
+        const end = new Date(l.date_to);
+        while (cur <= end) {
+          const dateStr = cur.toISOString().split('T')[0];
+          leaveSet.add(dateStr);
+          cur.setDate(cur.getDate() + 1);
+        }
+      }
+    });
+
+    const todayStr = now.toISOString().split('T')[0];
+
+    const grid = [];
+
+    // Empty lead cells
+    for (let i = 0; i < startDayOfWeek; i++) {
+      grid.push({ dayNumber: null });
+    }
+
+    // Actual month days
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dateObj = new Date(selectedYear, selectedMonth - 1, day);
+      const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+
+      const attRecord = attMap[dateStr];
+      const isLeave = leaveSet.has(dateStr);
+      const isPast = dateStr <= todayStr;
+
+      let status: 'present' | 'late' | 'absent' | 'leave' | 'weekend' = 'weekend';
+      let statusLabel = 'Weekend / Non travaillé';
+      let color = '#94a3b8'; // gray
+      let bgColor = '#f8fafc';
+
+      if (isLeave) {
+        status = 'leave';
+        statusLabel = 'Congé / Jour férié';
+        color = '#3b82f6';
+        bgColor = '#dbeafe';
+      } else if (attRecord) {
+        if (attRecord.is_late) {
+          status = 'late';
+          statusLabel = 'Présent (Retard)';
+          color = '#f59e0b';
+          bgColor = '#fef3c7';
+        } else {
+          status = 'present';
+          statusLabel = 'Présent';
+          color = '#10b981';
+          bgColor = '#dcfce7';
+        }
+      } else if (!isWeekend && isPast) {
+        status = 'absent';
+        statusLabel = 'Absent / Non pointé';
+        color = '#ef4444';
+        bgColor = '#fee2e2';
+      }
+
+      grid.push({
+        dayNumber: day,
+        dateStr,
+        status,
+        statusLabel,
+        color,
+        bgColor,
+        attRecord,
+        isLeave,
+        isWeekend,
+      });
+    }
+
+    return grid;
+  }, [monthlyAttendance, selectedMonth, selectedYear]);
+
+  // Click on a calendar day
+  const handleDayPress = (dayItem: any) => {
+    if (!dayItem.dayNumber) return;
+
+    const data: DayDetailData = {
+      date: dayItem.dateStr,
+      status: dayItem.status,
+      statusLabel: dayItem.statusLabel,
+      checkIn: dayItem.attRecord?.check_in ?? null,
+      checkOut: dayItem.attRecord?.check_out ?? null,
+      workedHours: dayItem.attRecord?.worked_hours ?? 0,
+      isLate: dayItem.attRecord?.is_late ?? false,
+      lateMinutes: dayItem.attRecord?.late_minutes ?? 0,
+      anomalyType: dayItem.attRecord?.anomaly_type ?? null,
+      attendanceId: dayItem.attRecord?.id,
+    };
+
+    setSelectedDayDetail(data);
+    setShowDetailModal(true);
+  };
+
+  const handleOpenAnomalyForDate = (data: DayDetailData) => {
+    setAnomalyInitialDate(data.date);
+    setShowAnomalyModal(true);
+  };
+
+  const stats = monthlyAttendance?.stats || {
+    present_days: 0,
+    late_days: 0,
+    absent_days: 0,
+    leave_days: 0,
+    total_worked_hours: 0,
+  };
+
+  const totalHrs = stats.total_worked_hours;
+  const hoursFormatted = `${Math.floor(totalHrs)}h ${Math.round((totalHrs % 1) * 60)}m`;
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Top Header */}
       <LinearGradient colors={['#1a1a2e', '#16213e']} style={styles.header}>
         <View style={styles.headerTop}>
           <View>
-            <Text style={styles.greeting}>{greeting},</Text>
-            <Text style={styles.userName}>{user.name || 'Employee'} 👋</Text>
-            <Text style={styles.department}>
-              {user.role ? user.role.toUpperCase() : 'Staff'}
-            </Text>
+            <Text style={styles.appName}>Smart HR AI ✦ Présence</Text>
+            <Text style={styles.userName}>{user.name || 'Employé'} 👋</Text>
           </View>
           <View style={styles.headerActions}>
-            {/* Bell with badge */}
             <TouchableOpacity
-              style={styles.bellWrapper}
+              style={styles.actionBtn}
               onPress={() => setShowNotifs(true)}
             >
-              <Bell color="#e2e8f0" size={22} />
+              <Bell color="#e2e8f0" size={20} />
               {unreadCount > 0 && (
-                <View style={styles.notifDot}>
-                  <Text style={styles.notifDotText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>{unreadCount}</Text>
                 </View>
               )}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+            <TouchableOpacity style={styles.actionBtn} onPress={handleLogout}>
               <LogOut color="#e2e8f0" size={20} />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Stats Row */}
+        {/* Month Selector Bar */}
+        <View style={styles.monthSelectorBar}>
+          <TouchableOpacity style={styles.monthArrow} onPress={handlePrevMonth}>
+            <ChevronLeft color="#f1f5f9" size={20} />
+          </TouchableOpacity>
+          <View style={styles.monthTitleWrapper}>
+            <CalendarIcon color="#818cf8" size={16} />
+            <Text style={styles.monthTitle}>
+              {MONTHS_FR[selectedMonth - 1]} {selectedYear}
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.monthArrow} onPress={handleNextMonth}>
+            <ChevronRight color="#f1f5f9" size={20} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Monthly Summary Stats Row */}
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
-            <Text style={[styles.statValue, isClockedIn ? styles.clockedInText : styles.clockedOutText]}>
-              {isClockedIn ? 'Active' : 'Offline'}
-            </Text>
-            <Text style={styles.statLabel}>Status</Text>
+            <Text style={[styles.statValue, { color: '#4ade80' }]}>{stats.present_days}</Text>
+            <Text style={styles.statLabel}>Présent</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{workedTodayHrs}</Text>
-            <Text style={styles.statLabel}>Today</Text>
+            <Text style={[styles.statValue, { color: '#fbbf24' }]}>{stats.late_days}</Text>
+            <Text style={styles.statLabel}>Retards</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{pendingLeaves.length}</Text>
-            <Text style={styles.statLabel}>Pending Req.</Text>
+            <Text style={[styles.statValue, { color: '#f87171' }]}>{stats.absent_days}</Text>
+            <Text style={styles.statLabel}>Absences</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={[styles.statValue, { color: '#60a5fa' }]}>{hoursFormatted}</Text>
+            <Text style={styles.statLabel}>Total Heures</Text>
           </View>
         </View>
       </LinearGradient>
@@ -178,122 +310,131 @@ export default function HomeScreen() {
           />
         }
       >
-        {/* Clock In Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Attendance</Text>
-          <View style={styles.clockCard}>
-            <View style={styles.clockCardInner}>
-              <View>
-                <Text style={styles.clockTitle}>
-                  {isClockedIn ? '🟢  Currently Clocked In' : '⚪  Not Clocked In'}
-                </Text>
-                <View style={styles.locationRow}>
-                  <MapPin color="#94a3b8" size={13} />
-                  <Text style={styles.locationText}>Synced with Odoo Attendance</Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                onPress={handleClockIn}
-                disabled={isClockLoading}
-                style={[
-                  styles.clockBtn,
-                  isClockedIn ? styles.clockBtnOut : styles.clockBtnIn,
-                  isClockLoading && styles.clockBtnLoading,
-                ]}
-              >
-                {isClockLoading ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <>
-                    <Clock color="#fff" size={16} />
-                    <Text style={styles.clockBtnText}>
-                      {isClockedIn ? 'Clock Out' : 'Clock In'}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-            {isClockedIn && (
-              <View style={styles.activeBar}>
-                <Text style={styles.activeBarText}>⏱  Working hours tracking active — synced live to Odoo</Text>
-              </View>
-            )}
-          </View>
+        {/* Read-Only Notice Bar */}
+        <View style={styles.readOnlyNotice}>
+          <Info color="#4338ca" size={16} />
+          <Text style={styles.readOnlyNoticeText}>
+            Les données ci-dessous proviennent du pointage physique Odoo (Lecture seule).
+          </Text>
         </View>
 
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.actionsGrid}>
-            <TouchableOpacity
-              style={[styles.actionCard, { backgroundColor: '#eff6ff' }]}
-              onPress={() => router.push('/(tabs)/leaves')}
-            >
-              <Calendar color="#3b82f6" size={28} />
-              <Text style={[styles.actionLabel, { color: '#1d4ed8' }]}>Request{'\n'}Time Off</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionCard, { backgroundColor: '#ede9fe' }]}
-              onPress={() => setShowCalendar(true)}
-            >
-              <CheckCircle color="#7c3aed" size={28} />
-              <Text style={[styles.actionLabel, { color: '#6d28d9' }]}>Attendance{'\n'}Calendar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionCard, { backgroundColor: '#f0fdf4' }]}
-              onPress={() => router.push('/(tabs)/performance')}
-            >
-              <TrendingUp color="#16a34a" size={28} />
-              <Text style={[styles.actionLabel, { color: '#15803d' }]}>View{'\n'}Performance</Text>
-            </TouchableOpacity>
+        {/* Calendar Section */}
+        <View style={styles.calendarContainer}>
+          <View style={styles.calendarHeaderRow}>
+            <Text style={styles.calendarSectionTitle}>Calendrier Mensuel</Text>
+            {isMonthlyLoading && <ActivityIndicator color="#6366f1" size="small" />}
           </View>
-        </View>
 
-        {/* Recent Leaves */}
-        {leaveRequests.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Recent Leave Requests</Text>
-            {leaveRequests.slice(0, 3).map((req) => {
-              const isApproved = req.status === 'validate' || req.status === 'Approved';
-              const isPending = req.status === 'confirm' || req.status === 'Pending';
-              const bgColor = isApproved ? '#dcfce7' : isPending ? '#fef9c3' : '#fee2e2';
-              const txtColor = isApproved ? '#15803d' : isPending ? '#92400e' : '#b91c1c';
-              const label = isApproved ? 'Approved' : isPending ? 'Pending' : 'Refused';
+          {/* Weekday Labels */}
+          <View style={styles.weekdayRow}>
+            {WEEKDAYS.map((w, idx) => (
+              <Text key={idx} style={styles.weekdayText}>{w}</Text>
+            ))}
+          </View>
+
+          {/* Calendar Days Grid */}
+          <View style={styles.daysGrid}>
+            {calendarDays.map((item, index) => {
+              if (!item.dayNumber) {
+                return <View key={index} style={styles.emptyDayCell} />;
+              }
+
+              const isToday =
+                item.dayNumber === now.getDate() &&
+                selectedMonth === currentRealMonth &&
+                selectedYear === currentRealYear;
+
               return (
-                <View key={req.id} style={styles.notifCard}>
-                  <View style={[styles.notifIcon, { backgroundColor: bgColor }]}>
-                    {isApproved
-                      ? <CheckCircle color="#16a34a" size={20} />
-                      : isPending
-                      ? <Clock color="#d97706" size={20} />
-                      : <Bell color="#dc2626" size={20} />
-                    }
-                  </View>
-                  <View style={styles.notifBody}>
-                    <Text style={styles.notifTitle}>{req.leaveType || req.reason || 'Leave Request'}</Text>
-                    <Text style={styles.notifText}>{req.startDate} → {req.endDate}</Text>
-                    <Text style={[styles.notifTime, { color: txtColor, fontWeight: '700' }]}>{label}</Text>
-                  </View>
-                </View>
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.dayCell,
+                    { backgroundColor: item.bgColor },
+                    isToday && styles.todayBorder,
+                  ]}
+                  onPress={() => handleDayPress(item)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.dayNumberText, { color: item.color }]}>
+                    {item.dayNumber}
+                  </Text>
+
+                  {/* Indicator Dot */}
+                  <View style={[styles.dotIndicator, { backgroundColor: item.color }]} />
+                </TouchableOpacity>
               );
             })}
           </View>
-        )}
 
-        <View style={{ height: 100 }} />
+          {/* Color Code Legend */}
+          <View style={styles.legendContainer}>
+            <Text style={styles.legendTitle}>Légende des couleurs :</Text>
+            <View style={styles.legendGrid}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#10b981' }]} />
+                <Text style={styles.legendLabel}>Présent</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#f59e0b' }]} />
+                <Text style={styles.legendLabel}>Retard</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#ef4444' }]} />
+                <Text style={styles.legendLabel}>Absent</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#3b82f6' }]} />
+                <Text style={styles.legendLabel}>Congé / Férié</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#94a3b8' }]} />
+                <Text style={styles.legendLabel}>Weekend</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Anomaly & Claims Action Bar */}
+        <View style={styles.claimsBanner}>
+          <View style={styles.claimsBannerLeft}>
+            <AlertTriangle color="#dc2626" size={24} />
+            <View>
+              <Text style={styles.claimsBannerTitle}>Erreur sur votre présence ?</Text>
+              <Text style={styles.claimsBannerSub}>
+                {pendingAnomaliesCount > 0
+                  ? `${pendingAnomaliesCount} réclamation(s) en attente du RH`
+                  : "Signalez toute omission ou erreur de pointage."}
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.claimsBannerBtn}
+            onPress={() => {
+              setAnomalyInitialDate(undefined);
+              setShowAnomalyModal(true);
+            }}
+          >
+            <FileText color="#ffffff" size={16} />
+            <Text style={styles.claimsBannerBtnText}>Suivi Réclamations</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={{ height: 90 }} />
       </ScrollView>
 
-      {/* Attendance Calendar Modal */}
-      <CalendarModal
-        visible={showCalendar}
-        onClose={() => setShowCalendar(false)}
-        title="Attendance Calendar"
-        marks={attendanceMarks}
-        legend={[
-          { color: '#10b981', label: 'Present' },
-          { color: '#f59e0b', label: 'Late arrival' },
-          { color: '#ef4444', label: 'Issue / No checkout' },
-        ]}
+      {/* Day Detail Modal */}
+      <DayDetailModal
+        visible={showDetailModal}
+        onClose={() => setShowDetailModal(false)}
+        data={selectedDayDetail}
+        onReportAnomaly={handleOpenAnomalyForDate}
+      />
+
+      {/* Anomaly Modal */}
+      <AnomalyModal
+        visible={showAnomalyModal}
+        onClose={() => setShowAnomalyModal(false)}
+        initialDate={anomalyInitialDate}
       />
 
       {/* Notifications Modal */}
@@ -309,55 +450,142 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
-  header: { paddingTop: 56, paddingBottom: 24, paddingHorizontal: 24 },
-  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
-  greeting: { color: '#94a3b8', fontSize: 15, fontWeight: '500' },
-  userName: { color: '#f1f5f9', fontSize: 28, fontWeight: '800', marginTop: 2 },
-  department: { color: '#64748b', fontSize: 13, marginTop: 4 },
+  header: { paddingTop: 52, paddingBottom: 20, paddingHorizontal: 20 },
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  appName: { color: '#818cf8', fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
+  userName: { color: '#f1f5f9', fontSize: 24, fontWeight: '800', marginTop: 2 },
   headerActions: { flexDirection: 'row', gap: 10 },
-  bellWrapper: { backgroundColor: 'rgba(255,255,255,0.08)', padding: 12, borderRadius: 14, position: 'relative' },
-  notifDot: {
+  actionBtn: { backgroundColor: 'rgba(255,255,255,0.08)', padding: 10, borderRadius: 12, position: 'relative' },
+  notifBadge: {
     minWidth: 16, height: 16,
     backgroundColor: '#ef4444',
     borderRadius: 99,
-    position: 'absolute', top: 7, right: 7,
-    borderWidth: 1.5, borderColor: '#16213e',
+    position: 'absolute', top: 5, right: 5,
     alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 3,
   },
-  notifDotText: { color: '#fff', fontSize: 9, fontWeight: '800' },
-  logoutBtn: { backgroundColor: 'rgba(255,255,255,0.08)', padding: 12, borderRadius: 14 },
-  statsRow: { flexDirection: 'row', gap: 12 },
-  statCard: { flex: 1, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 16, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  statValue: { color: '#f1f5f9', fontSize: 20, fontWeight: '800' },
-  statLabel: { color: '#64748b', fontSize: 11, marginTop: 4, textAlign: 'center' },
-  clockedInText: { color: '#4ade80' },
-  clockedOutText: { color: '#94a3b8' },
+  notifBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+
+  monthSelectorBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 16,
+  },
+  monthArrow: { padding: 6 },
+  monthTitleWrapper: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  monthTitle: { color: '#ffffff', fontSize: 16, fontWeight: '800' },
+
+  statsRow: { flexDirection: 'row', gap: 8 },
+  statCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  statValue: { fontSize: 17, fontWeight: '800' },
+  statLabel: { color: '#94a3b8', fontSize: 10, marginTop: 2, textAlign: 'center', fontWeight: '600' },
+
   scroll: { flex: 1 },
-  section: { paddingHorizontal: 20, marginTop: 24 },
-  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#0f172a' },
-  calendarPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#ede9fe', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99 },
-  calendarPillText: { fontSize: 12, fontWeight: '700', color: '#6366f1' },
-  clockCard: { backgroundColor: '#ffffff', borderRadius: 20, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 3 },
-  clockCardInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20 },
-  clockTitle: { fontSize: 15, fontWeight: '700', color: '#0f172a', marginBottom: 6 },
-  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  locationText: { color: '#94a3b8', fontSize: 12 },
-  clockBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 18, borderRadius: 14, minWidth: 110, justifyContent: 'center' },
-  clockBtnIn: { backgroundColor: '#10b981' },
-  clockBtnOut: { backgroundColor: '#ef4444' },
-  clockBtnLoading: { opacity: 0.65 },
-  clockBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  activeBar: { backgroundColor: '#f0fdf4', paddingVertical: 10, paddingHorizontal: 20, borderTopWidth: 1, borderTopColor: '#dcfce7' },
-  activeBarText: { color: '#15803d', fontSize: 12, fontWeight: '600' },
-  actionsGrid: { flexDirection: 'row', gap: 12 },
-  actionCard: { flex: 1, borderRadius: 18, padding: 16, alignItems: 'center', gap: 10 },
-  actionLabel: { fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 17 },
-  notifCard: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  notifIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-  notifBody: { flex: 1 },
-  notifTitle: { fontSize: 14, fontWeight: '700', color: '#0f172a', marginBottom: 4 },
-  notifText: { fontSize: 13, color: '#64748b', lineHeight: 18 },
-  notifTime: { fontSize: 11, color: '#94a3b8', marginTop: 6 },
+
+  readOnlyNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#e0e7ff',
+    marginHorizontal: 20,
+    marginTop: 16,
+    padding: 12,
+    borderRadius: 14,
+  },
+  readOnlyNoticeText: { fontSize: 12, color: '#3730a3', fontWeight: '600', flex: 1 },
+
+  calendarContainer: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 20,
+    marginTop: 16,
+    borderRadius: 20,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  calendarHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  calendarSectionTitle: { fontSize: 16, fontWeight: '800', color: '#0f172a' },
+
+  weekdayRow: { flexDirection: 'row', marginBottom: 8 },
+  weekdayText: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '700', color: '#94a3b8' },
+
+  daysGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  emptyDayCell: { width: '14.28%', height: 48 },
+  dayCell: {
+    width: '14.28%',
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    marginBottom: 6,
+  },
+  todayBorder: {
+    borderWidth: 2,
+    borderColor: '#6366f1',
+  },
+  dayNumberText: { fontSize: 14, fontWeight: '800' },
+  dotIndicator: { width: 5, height: 5, borderRadius: 99, marginTop: 2 },
+
+  legendContainer: {
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  legendTitle: { fontSize: 12, fontWeight: '700', color: '#64748b', marginBottom: 8 },
+  legendGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  legendDot: { width: 8, height: 8, borderRadius: 99 },
+  legendLabel: { fontSize: 11, color: '#475569', fontWeight: '600' },
+
+  claimsBanner: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 20,
+    marginTop: 16,
+    borderRadius: 20,
+    padding: 16,
+    gap: 14,
+    borderWidth: 1,
+    borderColor: '#fee2e2',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  claimsBannerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  claimsBannerTitle: { fontSize: 15, fontWeight: '800', color: '#0f172a' },
+  claimsBannerSub: { fontSize: 12, color: '#64748b', marginTop: 2 },
+  claimsBannerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#dc2626',
+    paddingVertical: 12,
+    borderRadius: 14,
+  },
+  claimsBannerBtnText: { color: '#ffffff', fontWeight: '800', fontSize: 14 },
 });

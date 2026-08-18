@@ -5,10 +5,15 @@ import {
   REFRESH_TOKEN_KEY,
   AttendanceRecord,
   AppraisalRecord,
+  MonthlyAttendanceResponse,
+  AnomalyRecord,
   apiGetMe,
   apiLogin,
   apiGetLeaves,
   apiGetAttendances,
+  apiGetMonthlyAttendance,
+  apiReportAnomaly,
+  apiGetMyAnomalies,
   apiGetAppraisals,
   apiGetAppraisalAnalysis,
 } from '../utils/api';
@@ -47,9 +52,13 @@ interface AppState {
   authError: string | null;
   user: UserProfile;
 
-  // Attendance
-  isClockedIn: boolean;
+  // Attendance & Monthly Data
   attendances: AttendanceRecord[];
+  monthlyAttendance: MonthlyAttendanceResponse | null;
+  selectedMonth: number;
+  selectedYear: number;
+  isMonthlyLoading: boolean;
+  myAnomalies: AnomalyRecord[];
 
   // Leaves
   leaveRequests: LeaveRequest[];
@@ -59,22 +68,28 @@ interface AppState {
 
   // Appraisals / Performance (live from Odoo)
   appraisals: AppraisalRecord[];
-  appraisalDetail: AppraisalRecord | null; // latest appraisal with AI summary
+  appraisalDetail: AppraisalRecord | null;
 
   // Actions
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   restoreSession: () => Promise<boolean>;
   refreshData: () => Promise<void>;
-  toggleClockIn: () => void;
+  fetchMonthlyAttendance: (month: number, year: number) => Promise<void>;
+  fetchMyAnomalies: () => Promise<void>;
+  submitAnomalyClaim: (payload: {
+    date: string;
+    comment: string;
+    attendance_id?: number;
+    attachment_base64?: string;
+    attachment_name?: string;
+  }) => Promise<AnomalyRecord>;
   setLeaveRequests: (requests: LeaveRequest[]) => void;
   addLeaveRequest: (request: LeaveRequest) => void;
-  setClockedIn: (value: boolean) => void;
   setAttendances: (records: AttendanceRecord[]) => void;
   markNotificationsRead: () => void;
 }
 
-// Build in-app notifications from leave history — shows all actionable leaves
 function buildNotifications(leaves: LeaveRequest[], existing: Notification[]): Notification[] {
   const readIds = new Set(existing.filter((n) => n.read).map((n) => n.id));
   const notifs: Notification[] = [];
@@ -109,6 +124,8 @@ function buildNotifications(leaves: LeaveRequest[], existing: Notification[]): N
   return notifs;
 }
 
+const now = new Date();
+
 export const useAppStore = create<AppState>((set, get) => ({
   isLoggedIn: false,
   isAuthLoading: true,
@@ -117,10 +134,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     name: '',
     department: '',
     employeeId: null,
-    role: 'employee',
+    role: '',
   },
-  isClockedIn: false,
+
   attendances: [],
+  monthlyAttendance: null,
+  selectedMonth: now.getMonth() + 1,
+  selectedYear: now.getFullYear(),
+  isMonthlyLoading: false,
+  myAnomalies: [],
+
   leaveRequests: [],
   notifications: [],
   appraisals: [],
@@ -145,10 +168,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         },
       });
 
-      // Eagerly load data after login
       get().refreshData();
     } catch (err: any) {
-      set({ isAuthLoading: false, authError: err.message ?? 'Login failed' });
+      set({
+        isAuthLoading: false,
+        authError: err.message ?? 'Login failed',
+      });
+      throw err;
     }
   },
 
@@ -157,13 +183,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
     set({
       isLoggedIn: false,
-      user: { name: '', department: '', employeeId: null, role: 'employee' },
-      leaveRequests: [],
+      user: { name: '', department: '', employeeId: null, role: '' },
       attendances: [],
+      monthlyAttendance: null,
+      myAnomalies: [],
+      leaveRequests: [],
       notifications: [],
       appraisals: [],
       appraisalDetail: null,
-      isClockedIn: false,
     });
   },
 
@@ -186,7 +213,6 @@ export const useAppStore = create<AppState>((set, get) => ({
           role: me.role,
         },
       });
-      // Eagerly load data after session restore
       get().refreshData();
       return true;
     } catch {
@@ -197,8 +223,39 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  refreshData: async () => {
+  fetchMonthlyAttendance: async (month: number, year: number) => {
     const { user } = get();
+    if (!user.employeeId) return;
+
+    set({ isMonthlyLoading: true, selectedMonth: month, selectedYear: year });
+    try {
+      const data = await apiGetMonthlyAttendance(user.employeeId, month, year);
+      set({ monthlyAttendance: data, isMonthlyLoading: false });
+    } catch (err) {
+      set({ isMonthlyLoading: false });
+    }
+  },
+
+  fetchMyAnomalies: async () => {
+    try {
+      const anomalies = await apiGetMyAnomalies();
+      set({ myAnomalies: anomalies });
+    } catch (_) {}
+  },
+
+  submitAnomalyClaim: async (payload) => {
+    const anomaly = await apiReportAnomaly(payload);
+    set((s) => ({ myAnomalies: [anomaly, ...s.myAnomalies] }));
+    // Refresh monthly data to reflect the anomaly status
+    const { selectedMonth, selectedYear } = get();
+    get().fetchMonthlyAttendance(selectedMonth, selectedYear);
+    return anomaly;
+  },
+
+  refreshData: async () => {
+    const { user, selectedMonth, selectedYear } = get();
+
+    // Fetch leaves
     try {
       const rawLeaves = await apiGetLeaves();
       const mapped: LeaveRequest[] = rawLeaves.map((l: any) => ({
@@ -216,13 +273,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (_) {}
 
     if (user.employeeId) {
-      try {
-        const records = await apiGetAttendances(user.employeeId);
-        const isClockedIn = records.length > 0 && !records[0].check_out;
-        set({ attendances: records, isClockedIn });
-      } catch (_) {}
+      // Fetch monthly attendance + anomalies
+      get().fetchMonthlyAttendance(selectedMonth, selectedYear);
+      get().fetchMyAnomalies();
 
-      // Fetch appraisals + AI analysis for latest one
+      // Fetch appraisals + AI analysis
       try {
         const appraisals = await apiGetAppraisals(user.employeeId);
         set({ appraisals });
@@ -234,8 +289,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  toggleClockIn: () => set((s) => ({ isClockedIn: !s.isClockedIn })),
-  setClockedIn: (value) => set({ isClockedIn: value }),
   setLeaveRequests: (requests) => set({ leaveRequests: requests }),
   addLeaveRequest: (request) =>
     set((s) => ({ leaveRequests: [request, ...s.leaveRequests] })),

@@ -152,6 +152,80 @@ export interface AttendanceRecord {
   anomaly_type: string | null;
 }
 
+export interface MonthlyAttendanceStats {
+  present_days: number;
+  late_days: number;
+  absent_days: number;
+  leave_days: number;
+  total_worked_hours: number;
+}
+
+export interface MonthlyLeaveRecord {
+  id: number;
+  leave_type: string;
+  date_from: string | null;
+  date_to: string | null;
+  number_of_days: number;
+}
+
+export interface AnomalyRecord {
+  id: number;
+  employee_id: number;
+  employee: string;
+  anomaly_type: string;
+  status: 'pending' | 'resolved' | 'rejected';
+  date_concerned: string | null;
+  comment: string;
+  rh_comment: string;
+  attachment_name?: string | null;
+  detected_on: string | null;
+  resolved: boolean;
+}
+
+export interface MonthlyAttendanceResponse {
+  employee_id: number;
+  month: number;
+  year: number;
+  stats: MonthlyAttendanceStats;
+  attendances: AttendanceRecord[];
+  leaves: MonthlyLeaveRecord[];
+  anomalies: AnomalyRecord[];
+}
+
+export async function apiGetMonthlyAttendance(
+  employeeId: number,
+  month: number,
+  year: number
+): Promise<MonthlyAttendanceResponse> {
+  const res = await apiFetch(`/api/v1/attendance/${employeeId}?month=${month}&year=${year}`);
+  if (!res.ok) throw new Error('Failed to fetch monthly attendance');
+  return res.json();
+}
+
+export async function apiReportAnomaly(payload: {
+  date: string;
+  comment: string;
+  attendance_id?: number;
+  attachment_base64?: string;
+  attachment_name?: string;
+}): Promise<AnomalyRecord> {
+  const res = await apiFetch('/api/v1/attendance/anomaly', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? 'Failed to submit anomaly claim');
+  }
+  return res.json();
+}
+
+export async function apiGetMyAnomalies(): Promise<AnomalyRecord[]> {
+  const res = await apiFetch('/api/v1/attendance/anomalies/my');
+  if (!res.ok) throw new Error('Failed to fetch anomaly claims');
+  return res.json();
+}
+
 // ─── Appraisals helpers ───────────────────────────────────────────────────────
 export interface AppraisalRecord {
   id: number;
