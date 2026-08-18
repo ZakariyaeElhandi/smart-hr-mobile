@@ -17,6 +17,9 @@ import {
   apiGetMyAnomalies,
   apiGetAppraisals,
   apiGetAppraisalAnalysis,
+  DocumentRequestRecord,
+  apiGetDocumentRequests,
+  apiCreateDocumentRequest,
 } from '../utils/api';
 
 export interface LeaveRequest {
@@ -68,6 +71,9 @@ interface AppState {
   // Notifications (in-app)
   notifications: Notification[];
 
+  // Documents
+  documentRequests: DocumentRequestRecord[];
+
   // Appraisals / Performance
   appraisals: AppraisalRecord[];
   appraisalDetail: AppraisalRecord | null;
@@ -80,6 +86,14 @@ interface AppState {
   refreshData: () => Promise<void>;
   fetchMonthlyAttendance: (month: number, year: number) => Promise<void>;
   fetchMyAnomalies: () => Promise<void>;
+  fetchDocumentRequests: () => Promise<void>;
+  submitDocumentRequest: (payload: {
+    document_type: string;
+    custom_type_label?: string;
+    period_month?: string;
+    period_year?: number;
+    comment?: string;
+  }) => Promise<void>;
   submitAnomalyClaim: (payload: {
     date: string;
     comment: string;
@@ -150,6 +164,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   leaveRequests: [],
   notifications: [],
+  documentRequests: [],
   appraisals: [],
   appraisalDetail: null,
 
@@ -257,6 +272,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (_) {}
   },
 
+  fetchDocumentRequests: async () => {
+    try {
+      const docs = await apiGetDocumentRequests();
+      set({ documentRequests: docs });
+    } catch (_) {}
+  },
+
+  submitDocumentRequest: async (payload) => {
+    await apiCreateDocumentRequest(payload);
+    await get().fetchDocumentRequests();
+  },
+
   submitAnomalyClaim: async (payload) => {
     const anomaly = await apiReportAnomaly(payload);
     set((s) => ({ myAnomalies: [anomaly, ...s.myAnomalies] }));
@@ -285,6 +312,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       const notifs = buildNotifications(mapped, get().notifications);
       set({ leaveRequests: mapped, notifications: notifs });
     } catch (_) {}
+
+    // Fetch document requests
+    get().fetchDocumentRequests();
 
     if (user.employeeId) {
       // Fetch monthly attendance + anomalies

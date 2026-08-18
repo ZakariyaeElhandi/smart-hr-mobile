@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -10,6 +11,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -75,158 +77,162 @@ export default function LoginScreen() {
       : null;
 
   return (
-    <LinearGradient colors={['#0f172a', '#1e1b4b', '#0f172a']} style={styles.gradient}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.flex}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <LinearGradient colors={['#0f172a', '#1e1b4b', '#0f172a']} style={styles.gradient}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.flex}
         >
-          {/* Logo & Header */}
-          <View style={styles.logoSection}>
-            <View style={styles.logoCircle}>
-              <ShieldCheck color="#818cf8" size={38} />
-            </View>
-            <Text style={styles.appName}>Smart HR</Text>
-            <Text style={styles.tagline}>Portail Collaborateur & Ressources Humaines</Text>
-          </View>
-
-          {/* Login Card */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Connexion</Text>
-            <Text style={styles.cardSubtitle}>Identifiez-vous pour accéder à votre espace RH</Text>
-
-            {/* Email */}
-            <View style={styles.inputRow}>
-              <Mail color="#94a3b8" size={18} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Adresse e-mail professionnelle"
-                placeholderTextColor="#64748b"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
-
-            {/* Password */}
-            <View style={styles.inputRow}>
-              <Lock color="#94a3b8" size={18} style={styles.inputIcon} />
-              <TextInput
-                style={[styles.input, styles.inputFlex]}
-                placeholder="Mot de passe"
-                placeholderTextColor="#64748b"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-              />
-              <TouchableOpacity onPress={() => setShowPassword((v) => !v)} style={styles.eyeBtn}>
-                {showPassword ? (
-                  <EyeOff color="#94a3b8" size={18} />
-                ) : (
-                  <Eye color="#94a3b8" size={18} />
-                )}
-              </TouchableOpacity>
-            </View>
-
-            {/* Error Display */}
-            {formattedError ? (
-              <View style={styles.errorBox}>
-                <Text style={styles.errorText}>⚠️ {formattedError}</Text>
+          <ScrollView
+            contentContainerStyle={styles.scroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Logo & Header */}
+            <View style={styles.logoSection}>
+              <View style={styles.logoCircle}>
+                <ShieldCheck color="#818cf8" size={38} />
               </View>
-            ) : null}
+              <Text style={styles.appName}>Smart HR</Text>
+              <Text style={styles.tagline}>Portail Collaborateur & Ressources Humaines</Text>
+            </View>
 
-            {/* Login Button */}
-            <TouchableOpacity
-              style={[styles.loginBtn, isAuthLoading && styles.loginBtnDisabled]}
-              onPress={handleLogin}
-              disabled={isAuthLoading}
-              activeOpacity={0.85}
-            >
-              <LinearGradient
-                colors={['#6366f1', '#4f46e5']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.loginGradient}
+            {/* Login Card */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Connexion</Text>
+              <Text style={styles.cardSubtitle}>Identifiez-vous pour accéder à votre espace RH</Text>
+
+              {/* Email */}
+              <View style={styles.inputRow}>
+                <Mail color="#94a3b8" size={18} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Adresse e-mail professionnelle"
+                  placeholderTextColor="#64748b"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+
+              {/* Password */}
+              <View style={styles.inputRow}>
+                <Lock color="#94a3b8" size={18} style={styles.inputIcon} />
+                <TextInput
+                  style={[styles.input, styles.inputFlex]}
+                  placeholder="Mot de passe"
+                  placeholderTextColor="#64748b"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                />
+                <TouchableOpacity onPress={() => setShowPassword((v) => !v)} style={styles.eyeBtn}>
+                  {showPassword ? (
+                    <EyeOff color="#94a3b8" size={18} />
+                  ) : (
+                    <Eye color="#94a3b8" size={18} />
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {/* Error Display */}
+              {formattedError ? (
+                <View style={styles.errorBox}>
+                  <Text style={styles.errorText}>⚠️ {formattedError}</Text>
+                </View>
+              ) : null}
+
+              {/* Login Button */}
+              <TouchableOpacity
+                style={[styles.loginBtn, isAuthLoading && styles.loginBtnDisabled]}
+                onPress={handleLogin}
+                disabled={isAuthLoading}
+                activeOpacity={0.85}
               >
-                {isAuthLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.loginBtnText}>Se connecter</Text>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
+                <LinearGradient
+                  colors={['#6366f1', '#4f46e5']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.loginGradient}
+                >
+                  {isAuthLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.loginBtnText}>Se connecter</Text>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
 
-            <Text style={styles.hint}>
-              Utilisez vos identifiants professionnels fournis par le service RH.
-            </Text>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-
-      {/* Mandatory Change Password Modal */}
-      <Modal visible={mustChangePassword} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalIconCircle}>
-                <KeyRound color="#6366f1" size={24} />
-              </View>
-              <Text style={styles.modalTitle}>Changement de mot de passe obligatoire</Text>
-              <Text style={styles.modalSub}>
-                Bienvenue ! Il s'agit de votre première connexion. Veuillez définir votre mot de passe personnel sécurisé.
+              <Text style={styles.hint}>
+                Utilisez vos identifiants professionnels fournis par le service RH.
               </Text>
             </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
 
-            <Text style={styles.fieldLabel}>Nouveau mot de passe *</Text>
-            <View style={styles.modalInputRow}>
-              <Lock color="#64748b" size={18} style={styles.inputIcon} />
-              <TextInput
-                style={styles.modalInput}
-                placeholder="Au moins 6 caractères"
-                placeholderTextColor="#94a3b8"
-                secureTextEntry
-                value={newPassword}
-                onChangeText={setNewPassword}
-              />
+        {/* Mandatory Change Password Modal */}
+        <Modal visible={mustChangePassword} animationType="slide" transparent>
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalCard}>
+                <View style={styles.modalHeader}>
+                  <View style={styles.modalIconCircle}>
+                    <KeyRound color="#6366f1" size={24} />
+                  </View>
+                  <Text style={styles.modalTitle}>Changement de mot de passe obligatoire</Text>
+                  <Text style={styles.modalSub}>
+                    Bienvenue ! Il s'agit de votre première connexion. Veuillez définir votre mot de passe personnel sécurisé.
+                  </Text>
+                </View>
+
+                <Text style={styles.fieldLabel}>Nouveau mot de passe *</Text>
+                <View style={styles.modalInputRow}>
+                  <Lock color="#64748b" size={18} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Au moins 6 caractères"
+                    placeholderTextColor="#94a3b8"
+                    secureTextEntry
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                  />
+                </View>
+
+                <Text style={styles.fieldLabel}>Confirmer le mot de passe *</Text>
+                <View style={styles.modalInputRow}>
+                  <Lock color="#64748b" size={18} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Répéter le mot de passe"
+                    placeholderTextColor="#94a3b8"
+                    secureTextEntry
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={styles.modalSubmitBtn}
+                  onPress={handleChangePassword}
+                  disabled={isChangingPassword}
+                >
+                  <LinearGradient colors={['#6366f1', '#4f46e5']} style={styles.modalSubmitGrad}>
+                    {isChangingPassword ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.modalSubmitText}>Enregistrer le mot de passe</Text>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
             </View>
-
-            <Text style={styles.fieldLabel}>Confirmer le mot de passe *</Text>
-            <View style={styles.modalInputRow}>
-              <Lock color="#64748b" size={18} style={styles.inputIcon} />
-              <TextInput
-                style={styles.modalInput}
-                placeholder="Répéter le mot de passe"
-                placeholderTextColor="#94a3b8"
-                secureTextEntry
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-              />
-            </View>
-
-            <TouchableOpacity
-              style={styles.modalSubmitBtn}
-              onPress={handleChangePassword}
-              disabled={isChangingPassword}
-            >
-              <LinearGradient colors={['#6366f1', '#4f46e5']} style={styles.modalSubmitGrad}>
-                {isChangingPassword ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.modalSubmitText}>Enregistrer le mot de passe</Text>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    </LinearGradient>
+          </TouchableWithoutFeedback>
+        </Modal>
+      </LinearGradient>
+    </TouchableWithoutFeedback>
   );
 }
 

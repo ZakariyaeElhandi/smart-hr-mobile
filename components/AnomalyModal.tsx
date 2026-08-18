@@ -9,6 +9,10 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  TouchableWithoutFeedback,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { X, AlertTriangle, Paperclip, Send, Clock, CheckCircle2, XCircle } from 'lucide-react-native';
 import { useAppStore } from '../store/useAppStore';
@@ -30,7 +34,6 @@ export default function AnomalyModal({ visible, onClose, initialDate }: Props) {
   const [attachmentBase64, setAttachmentBase64] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Sync date when initialDate changes
   React.useEffect(() => {
     if (initialDate) {
       setDate(initialDate);
@@ -38,7 +41,6 @@ export default function AnomalyModal({ visible, onClose, initialDate }: Props) {
   }, [initialDate]);
 
   const handleSimulateAttachment = () => {
-    // Simulate attaching a photo / proof document
     setAttachmentName('justificatif_presence.jpg');
     setAttachmentBase64('data:image/jpeg;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==');
     Alert.alert('📎 Pièce jointe ajoutée', 'Fichier "justificatif_presence.jpg" sélectionné.');
@@ -75,110 +77,121 @@ export default function AnomalyModal({ visible, onClose, initialDate }: Props) {
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.overlay}>
-        <View style={styles.card}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.titleRow}>
-              <AlertTriangle color="#dc2626" size={22} />
-              <Text style={styles.title}>Signalement & Réclamations</Text>
-            </View>
-            <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-              <X color="#64748b" size={20} />
-            </TouchableOpacity>
-          </View>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.overlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.keyboardAvoiding}
+          >
+            <View style={styles.card}>
+              {/* Header */}
+              <View style={styles.header}>
+                <View style={styles.titleRow}>
+                  <AlertTriangle color="#dc2626" size={22} />
+                  <Text style={styles.title}>Signalement & Réclamations</Text>
+                </View>
+                <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+                  <X color="#64748b" size={20} />
+                </TouchableOpacity>
+              </View>
 
-          {/* Sub-tabs */}
-          <View style={styles.tabContainer}>
-            <TouchableOpacity
-              style={[styles.tabBtn, activeTab === 'form' && styles.tabBtnActive]}
-              onPress={() => setActiveTab('form')}
-            >
-              <Text style={[styles.tabText, activeTab === 'form' && styles.tabTextActive]}>
-                Signaler une erreur
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tabBtn, activeTab === 'list' && styles.tabBtnActive]}
-              onPress={() => {
-                fetchMyAnomalies();
-                setActiveTab('list');
-              }}
-            >
-              <Text style={[styles.tabText, activeTab === 'list' && styles.tabTextActive]}>
-                Mes Réclamations ({myAnomalies.length})
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-            {activeTab === 'form' ? (
-              <View style={styles.formContainer}>
-                {/* Date Concerned */}
-                <Text style={styles.label}>Date concernée</Text>
-                <TextInput
-                  style={styles.inputDate}
-                  value={date}
-                  onChangeText={setDate}
-                  placeholder="AAAA-MM-JJ"
-                />
-
-                {/* Comment / Reason */}
-                <Text style={styles.label}>Commentaire / Motif du signalement *</Text>
-                <TextInput
-                  style={styles.inputMultiline}
-                  value={comment}
-                  onChangeText={setComment}
-                  placeholder="Ex: J'étais présent sur le site mais la pointeuse physique était hors service..."
-                  multiline
-                  numberOfLines={4}
-                  textAlignVertical="top"
-                />
-
-                {/* Attachment */}
-                <Text style={styles.label}>Photo / Justificatif (optionnel)</Text>
-                <TouchableOpacity style={styles.attachmentBtn} onPress={handleSimulateAttachment}>
-                  <Paperclip color="#6366f1" size={18} />
-                  <Text style={styles.attachmentBtnText}>
-                    {attachmentName ? `Fichier : ${attachmentName}` : 'Ajouter un justificatif ou photo'}
+              {/* Sub-tabs */}
+              <View style={styles.tabContainer}>
+                <TouchableOpacity
+                  style={[styles.tabBtn, activeTab === 'form' && styles.tabBtnActive]}
+                  onPress={() => setActiveTab('form')}
+                >
+                  <Text style={[styles.tabText, activeTab === 'form' && styles.tabTextActive]}>
+                    Signaler une erreur
                   </Text>
                 </TouchableOpacity>
-
-                {/* Submit button */}
                 <TouchableOpacity
-                  style={[styles.submitBtn, isSubmitting && styles.submitBtnDisabled]}
-                  onPress={handleSubmit}
-                  disabled={isSubmitting}
+                  style={[styles.tabBtn, activeTab === 'list' && styles.tabBtnActive]}
+                  onPress={() => {
+                    fetchMyAnomalies();
+                    setActiveTab('list');
+                  }}
                 >
-                  {isSubmitting ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <>
-                      <Send color="#fff" size={18} />
-                      <Text style={styles.submitBtnText}>Transmettre au RH</Text>
-                    </>
-                  )}
+                  <Text style={[styles.tabText, activeTab === 'list' && styles.tabTextActive]}>
+                    Mes Réclamations ({myAnomalies.length})
+                  </Text>
                 </TouchableOpacity>
               </View>
-            ) : (
-              <View style={styles.listContainer}>
-                {myAnomalies.length === 0 ? (
-                  <View style={styles.emptyState}>
-                    <Clock color="#94a3b8" size={36} />
-                    <Text style={styles.emptyText}>Aucune réclamation enregistrée.</Text>
+
+              <ScrollView
+                style={styles.body}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                {activeTab === 'form' ? (
+                  <View style={styles.formContainer}>
+                    {/* Date Concerned */}
+                    <Text style={styles.label}>Date concernée</Text>
+                    <TextInput
+                      style={styles.inputDate}
+                      value={date}
+                      onChangeText={setDate}
+                      placeholder="AAAA-MM-JJ"
+                    />
+
+                    {/* Comment / Reason */}
+                    <Text style={styles.label}>Commentaire / Motif du signalement *</Text>
+                    <TextInput
+                      style={styles.inputMultiline}
+                      value={comment}
+                      onChangeText={setComment}
+                      placeholder="Ex: J'étais présent sur le site mais la pointeuse physique était hors service..."
+                      multiline
+                      numberOfLines={4}
+                      textAlignVertical="top"
+                    />
+
+                    {/* Attachment */}
+                    <Text style={styles.label}>Photo / Justificatif (optionnel)</Text>
+                    <TouchableOpacity style={styles.attachmentBtn} onPress={handleSimulateAttachment}>
+                      <Paperclip color="#6366f1" size={18} />
+                      <Text style={styles.attachmentBtnText}>
+                        {attachmentName ? `Fichier : ${attachmentName}` : 'Ajouter un justificatif ou photo'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Submit button */}
+                    <TouchableOpacity
+                      style={[styles.submitBtn, isSubmitting && styles.submitBtnDisabled]}
+                      onPress={handleSubmit}
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                      ) : (
+                        <>
+                          <Send color="#fff" size={18} />
+                          <Text style={styles.submitBtnText}>Transmettre au RH</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
                   </View>
                 ) : (
-                  myAnomalies.map((item) => (
-                    <ClaimCard key={item.id} item={item} />
-                  ))
+                  <View style={styles.listContainer}>
+                    {myAnomalies.length === 0 ? (
+                      <View style={styles.emptyState}>
+                        <Clock color="#94a3b8" size={36} />
+                        <Text style={styles.emptyText}>Aucune réclamation enregistrée.</Text>
+                      </View>
+                    ) : (
+                      myAnomalies.map((item) => (
+                        <ClaimCard key={item.id} item={item} />
+                      ))
+                    )}
+                  </View>
                 )}
-              </View>
-            )}
-            <View style={{ height: 20 }} />
-          </ScrollView>
+                <View style={{ height: 20 }} />
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 }
@@ -186,7 +199,6 @@ export default function AnomalyModal({ visible, onClose, initialDate }: Props) {
 function ClaimCard({ item }: { item: AnomalyRecord }) {
   const isResolved = item.status === 'resolved' || item.resolved;
   const isRejected = item.status === 'rejected';
-  const isPending = !isResolved && !isRejected;
 
   const badgeBg = isResolved ? '#dcfce7' : isRejected ? '#fee2e2' : '#fef9c3';
   const badgeColor = isResolved ? '#15803d' : isRejected ? '#b91c1c' : '#92400e';
@@ -226,12 +238,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 23, 42, 0.6)',
     justifyContent: 'flex-end',
   },
+  keyboardAvoiding: {
+    width: '100%',
+    maxHeight: '90%',
+  },
   card: {
     backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
-    maxHeight: '90%',
+    maxHeight: '100%',
   },
   header: {
     flexDirection: 'row',

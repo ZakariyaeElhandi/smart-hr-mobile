@@ -6,8 +6,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
-import { X, Clock, AlertTriangle, CheckCircle, Calendar, FileText, ArrowRight } from 'lucide-react-native';
+import { X, Clock, AlertTriangle, Calendar, FileText, ArrowRight } from 'lucide-react-native';
 
 export interface DayDetailData {
   date: string; // 'YYYY-MM-DD'
@@ -67,7 +69,6 @@ export default function DayDetailModal({ visible, onClose, data, onReportAnomaly
   const isLate = data.status === 'late';
   const isAbsent = data.status === 'absent';
   const isLeave = data.status === 'leave';
-  const isWeekend = data.status === 'weekend';
 
   const statusColor = isPresent ? '#10b981'
     : isLate ? '#f59e0b'
@@ -82,105 +83,107 @@ export default function DayDetailModal({ visible, onClose, data, onReportAnomaly
     : '#f1f5f9';
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.overlay}>
-        <View style={styles.card}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.titleRow}>
-              <Calendar color="#6366f1" size={20} />
-              <Text style={styles.dateTitle}>{formatLongDate(data.date)}</Text>
-            </View>
-            <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-              <X color="#64748b" size={20} />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-            {/* Status Badge */}
-            <View style={[styles.statusBadge, { backgroundColor: statusBg }]}>
-              <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-              <Text style={[styles.statusText, { color: statusColor }]}>
-                {data.statusLabel}
-              </Text>
-            </View>
-
-            {/* Read-Only Notice */}
-            <View style={styles.readOnlyBanner}>
-              <Clock color="#6366f1" size={16} />
-              <Text style={styles.readOnlyText}>
-                Données de présence enregistrées sur votre espace RH (Lecture seule)
-              </Text>
-            </View>
-
-            {/* Timings Info */}
-            <View style={styles.infoGrid}>
-              <View style={styles.infoBox}>
-                <Text style={styles.infoLabel}>Arrivée (Check-in)</Text>
-                <Text style={styles.infoValue}>{formatTime(data.checkIn)}</Text>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.overlay}>
+          <View style={styles.card}>
+            {/* Header */}
+            <View style={styles.header}>
+              <View style={styles.titleRow}>
+                <Calendar color="#6366f1" size={20} />
+                <Text style={styles.dateTitle}>{formatLongDate(data.date)}</Text>
               </View>
-              <View style={styles.infoBox}>
-                <Text style={styles.infoLabel}>Départ (Check-out)</Text>
-                <Text style={styles.infoValue}>{formatTime(data.checkOut)}</Text>
-              </View>
+              <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+                <X color="#64748b" size={20} />
+              </TouchableOpacity>
             </View>
 
-            {/* Hours worked & Lateness info */}
-            <View style={styles.detailsList}>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Durée travaillée :</Text>
-                <Text style={styles.detailValue}>{formatHours(data.workedHours)}</Text>
+            <ScrollView style={styles.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {/* Status Badge */}
+              <View style={[styles.statusBadge, { backgroundColor: statusBg }]}>
+                <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+                <Text style={[styles.statusText, { color: statusColor }]}>
+                  {data.statusLabel}
+                </Text>
               </View>
 
-              {data.isLate && (
-                <View style={[styles.detailRow, { backgroundColor: '#fffbeb', padding: 8, borderRadius: 8 }]}>
-                  <Text style={[styles.detailLabel, { color: '#d97706', fontWeight: '700' }]}>
-                    ⚠️ Retard détecté :
-                  </Text>
-                  <Text style={[styles.detailValue, { color: '#b45309', fontWeight: '800' }]}>
-                    {data.lateMinutes ? `${Math.round(data.lateMinutes)} min` : 'Oui'}
-                  </Text>
+              {/* Read-Only Notice */}
+              <View style={styles.readOnlyBanner}>
+                <Clock color="#6366f1" size={16} />
+                <Text style={styles.readOnlyText}>
+                  Données de présence enregistrées sur votre espace RH (Lecture seule)
+                </Text>
+              </View>
+
+              {/* Timings Info */}
+              <View style={styles.infoGrid}>
+                <View style={styles.infoBox}>
+                  <Text style={styles.infoLabel}>Arrivée (Check-in)</Text>
+                  <Text style={styles.infoValue}>{formatTime(data.checkIn)}</Text>
                 </View>
-              )}
+                <View style={styles.infoBox}>
+                  <Text style={styles.infoLabel}>Départ (Check-out)</Text>
+                  <Text style={styles.infoValue}>{formatTime(data.checkOut)}</Text>
+                </View>
+              </View>
 
-              {isLeave && (
+              {/* Hours worked & Lateness info */}
+              <View style={styles.detailsList}>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Type de congé :</Text>
-                  <Text style={[styles.detailValue, { color: '#2563eb' }]}>{data.leaveType || 'Congé approuvé'}</Text>
+                  <Text style={styles.detailLabel}>Durée travaillée :</Text>
+                  <Text style={styles.detailValue}>{formatHours(data.workedHours)}</Text>
+                </View>
+
+                {data.isLate && (
+                  <View style={[styles.detailRow, { backgroundColor: '#fffbeb', padding: 8, borderRadius: 8 }]}>
+                    <Text style={[styles.detailLabel, { color: '#d97706', fontWeight: '700' }]}>
+                      ⚠️ Retard détecté :
+                    </Text>
+                    <Text style={[styles.detailValue, { color: '#b45309', fontWeight: '800' }]}>
+                      {data.lateMinutes ? `${Math.round(data.lateMinutes)} min` : 'Oui'}
+                    </Text>
+                  </View>
+                )}
+
+                {isLeave && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Type de congé :</Text>
+                    <Text style={[styles.detailValue, { color: '#2563eb' }]}>{data.leaveType || 'Congé approuvé'}</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Anomaly Action Button */}
+              {(isAbsent || isLate || !data.checkOut || data.anomalyType) && (
+                <View style={styles.anomalySection}>
+                  <View style={styles.anomalyCallout}>
+                    <AlertTriangle color="#dc2626" size={18} />
+                    <Text style={styles.anomalyCalloutText}>
+                      Une anomalie ou une absence non prévue apparaît sur ce jour ?
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.anomalyBtn}
+                    onPress={() => {
+                      onClose();
+                      onReportAnomaly(data);
+                    }}
+                  >
+                    <FileText color="#fff" size={18} />
+                    <Text style={styles.anomalyBtnText}>Signaler une anomalie</Text>
+                    <ArrowRight color="#fff" size={16} />
+                  </TouchableOpacity>
                 </View>
               )}
-            </View>
 
-            {/* Anomaly Action Button */}
-            {(isAbsent || isLate || !data.checkOut || data.anomalyType) && (
-              <View style={styles.anomalySection}>
-                <View style={styles.anomalyCallout}>
-                  <AlertTriangle color="#dc2626" size={18} />
-                  <Text style={styles.anomalyCalloutText}>
-                    Une anomalie ou une absence non prévue apparaît sur ce jour ?
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.anomalyBtn}
-                  onPress={() => {
-                    onClose();
-                    onReportAnomaly(data);
-                  }}
-                >
-                  <FileText color="#fff" size={18} />
-                  <Text style={styles.anomalyBtnText}>Signaler une anomalie</Text>
-                  <ArrowRight color="#fff" size={16} />
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Close Button */}
-            <TouchableOpacity style={styles.doneBtn} onPress={onClose}>
-              <Text style={styles.doneBtnText}>Fermer</Text>
-            </TouchableOpacity>
-          </ScrollView>
+              {/* Close Button */}
+              <TouchableOpacity style={styles.doneBtn} onPress={onClose}>
+                <Text style={styles.doneBtnText}>Fermer</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 }

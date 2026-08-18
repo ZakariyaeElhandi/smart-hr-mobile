@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Clock, Calendar, TrendingUp } from 'lucide-react-native';
+import { Clock, Calendar, FileText, TrendingUp } from 'lucide-react-native';
 
 export default function TabLayout() {
   return (
@@ -34,8 +34,15 @@ export default function TabLayout() {
       <Tabs.Screen
         name="leaves"
         options={{
-          title: 'Congés & Absences',
+          title: 'Congés',
           tabBarIcon: ({ color, size }) => <Calendar color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="documents"
+        options={{
+          title: 'Documents',
+          tabBarIcon: ({ color, size }) => <FileText color={color} size={size} />,
         }}
       />
       <Tabs.Screen

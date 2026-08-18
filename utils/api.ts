@@ -263,7 +263,56 @@ export async function apiGetAppraisals(employeeId: number): Promise<AppraisalRec
 }
 
 export async function apiGetAppraisalAnalysis(appraisalId: number): Promise<AppraisalRecord> {
-  const res = await apiFetch(`/api/v1/appraisals/${appraisalId}/analysis`);
+  const res = await apiFetch(`/api/v1/appraisal/${appraisalId}`);
   if (!res.ok) throw new Error('Failed to fetch appraisal analysis');
   return res.json();
+}
+
+// ─── Documents helpers ────────────────────────────────────────────────────────
+export interface DocumentRequestRecord {
+  id: number;
+  document_type: string;
+  document_type_label: string;
+  custom_type_label?: string | null;
+  period_month?: string | null;
+  period_year?: number | null;
+  comment?: string | null;
+  status: 'pending' | 'processing' | 'ready' | 'delivered' | 'rejected';
+  status_label: string;
+  rejection_reason?: string | null;
+  has_file: boolean;
+  file_name: string;
+  request_date?: string | null;
+  processed_date?: string | null;
+}
+
+export async function apiGetDocumentRequests(): Promise<DocumentRequestRecord[]> {
+  const res = await apiFetch('/api/v1/documents/my');
+  if (!res.ok) throw new Error('Failed to fetch document requests');
+  const data = await res.json();
+  return data.requests ?? [];
+}
+
+export async function apiCreateDocumentRequest(payload: {
+  document_type: string;
+  custom_type_label?: string;
+  period_month?: string;
+  period_year?: number;
+  comment?: string;
+}): Promise<{ success: boolean; message: string; id: number }> {
+  const res = await apiFetch('/api/v1/documents/request', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? 'Failed to submit document request');
+  }
+  return res.json();
+}
+
+export async function apiDownloadDocument(docId: number): Promise<Response> {
+  const res = await apiFetch(`/api/v1/documents/${docId}/download`);
+  if (!res.ok) throw new Error('Failed to download document');
+  return res;
 }
