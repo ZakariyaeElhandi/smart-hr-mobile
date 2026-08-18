@@ -27,6 +27,8 @@ import {
   AlertCircle,
   FileCheck,
 } from 'lucide-react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { useAppStore } from '../../store/useAppStore';
 import { apiDownloadDocument, DocumentRequestRecord } from '../../utils/api';
 
@@ -114,8 +116,46 @@ export default function DocumentsScreen() {
 
   const handleDownload = async (doc: DocumentRequestRecord) => {
     try {
-      Alert.alert('Téléchargement', `Le fichier "${doc.file_name}" est prêt au téléchargement.`);
-      await apiDownloadDocument(doc.id);
+      const res = await apiDownloadDocument(doc.id);
+      if (!res.ok) {
+        Alert.alert('Erreur', 'Document non disponible pour le moment.');
+        return;
+      }
+
+      if (Platform.OS === 'web') {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = doc.file_name || `Document_${doc.id}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        Alert.alert('✅ Téléchargement', `Le fichier "${doc.file_name || 'Document.pdf'}" a été téléchargé.`);
+      } else {
+        const blob = await res.blob();
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const rawResult = reader.result as string;
+          const base64data = rawResult?.split(',')[1];
+          if (!base64data) {
+            Alert.alert('Erreur', 'Contenu du fichier illisible.');
+            return;
+          }
+          const fileUri = `${FileSystem.documentDirectory}${doc.file_name || `Document_${doc.id}.pdf`}`;
+          await FileSystem.writeAsStringAsync(fileUri, base64data, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(fileUri);
+          } else {
+            Alert.alert('✅ Document téléchargé', `Le fichier a été enregistré sur votre appareil.`);
+          }
+        };
+        reader.readAsDataURL(blob);
+      }
     } catch (err: any) {
       Alert.alert('Erreur', err.message ?? 'Fichier non disponible.');
     }
