@@ -75,6 +75,7 @@ export async function apiLogin(login: string, password: string) {
     access_token: string;
     refresh_token: string;
     expires_in: number;
+    must_change_password?: boolean;
   }>;
 }
 
@@ -82,13 +83,29 @@ export async function apiGetMe() {
   const res = await apiFetch('/api/v1/auth/me');
   if (!res.ok) throw new Error('Failed to fetch user profile');
   return res.json() as Promise<{
-    user_id: number;
+    user_id: number | null;
     name: string;
     login: string;
     employee_id: number | null;
     employee_name: string | null;
     role: string;
+    must_change_password?: boolean;
   }>;
+}
+
+export async function apiChangePassword(newPassword: string, oldPassword?: string) {
+  const res = await apiFetch('/api/v1/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({
+      old_password: oldPassword,
+      new_password: newPassword,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? 'Password change failed');
+  }
+  return res.json();
 }
 
 // ─── Leaves helpers ───────────────────────────────────────────────────────────

@@ -9,6 +9,7 @@ import {
   AnomalyRecord,
   apiGetMe,
   apiLogin,
+  apiChangePassword,
   apiGetLeaves,
   apiGetAttendances,
   apiGetMonthlyAttendance,
@@ -50,6 +51,7 @@ interface AppState {
   isLoggedIn: boolean;
   isAuthLoading: boolean;
   authError: string | null;
+  mustChangePassword: boolean;
   user: UserProfile;
 
   // Attendance & Monthly Data
@@ -73,6 +75,7 @@ interface AppState {
   // Actions
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  changePassword: (newPassword: string, oldPassword?: string) => Promise<void>;
   restoreSession: () => Promise<boolean>;
   refreshData: () => Promise<void>;
   fetchMonthlyAttendance: (month: number, year: number) => Promise<void>;
@@ -130,6 +133,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   isLoggedIn: false,
   isAuthLoading: true,
   authError: null,
+  mustChangePassword: false,
   user: {
     name: '',
     department: '',
@@ -157,9 +161,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refresh_token);
 
       const me = await apiGetMe();
+      const mustChange = tokens.must_change_password ?? me.must_change_password ?? false;
+
       set({
         isLoggedIn: true,
         isAuthLoading: false,
+        mustChangePassword: mustChange,
         user: {
           name: me.employee_name ?? me.name,
           department: '',
@@ -178,11 +185,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  changePassword: async (newPassword, oldPassword) => {
+    await apiChangePassword(newPassword, oldPassword);
+    set({ mustChangePassword: false });
+  },
+
   logout: async () => {
     await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
     await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
     set({
       isLoggedIn: false,
+      mustChangePassword: false,
       user: { name: '', department: '', employeeId: null, role: '' },
       attendances: [],
       monthlyAttendance: null,
@@ -199,13 +212,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const token = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
       if (!token) {
-        set({ isAuthLoading: false, isLoggedIn: false });
+        set({ isAuthLoading: false, isLoggedIn: false, mustChangePassword: false });
         return false;
       }
       const me = await apiGetMe();
       set({
         isLoggedIn: true,
         isAuthLoading: false,
+        mustChangePassword: me.must_change_password ?? false,
         user: {
           name: me.employee_name ?? me.name,
           department: '',
@@ -218,7 +232,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch {
       await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
       await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
-      set({ isAuthLoading: false, isLoggedIn: false });
+      set({ isAuthLoading: false, isLoggedIn: false, mustChangePassword: false });
       return false;
     }
   },

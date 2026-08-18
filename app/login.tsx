@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -13,15 +14,20 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Eye, EyeOff, Lock, Mail, ShieldCheck } from 'lucide-react-native';
+import { Eye, EyeOff, Lock, Mail, ShieldCheck, KeyRound } from 'lucide-react-native';
 import { useAppStore } from '../store/useAppStore';
-import { Theme } from '../constants/theme';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const { login, isAuthLoading, authError } = useAppStore();
+
+  // Change password modal state
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const { login, changePassword, mustChangePassword, isAuthLoading, authError } = useAppStore();
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -30,8 +36,8 @@ export default function LoginScreen() {
     }
     try {
       await login(email.trim(), password);
-      const isLoggedIn = useAppStore.getState().isLoggedIn;
-      if (isLoggedIn) {
+      const state = useAppStore.getState();
+      if (state.isLoggedIn && !state.mustChangePassword) {
         router.replace('/(tabs)');
       }
     } catch (err: any) {
@@ -39,11 +45,34 @@ export default function LoginScreen() {
     }
   };
 
-  const formattedError = authError === 'invalid_credentials' || authError?.includes('Identifiants')
-    ? 'Adresse e-mail ou mot de passe incorrect. Veuillez réanalyser vos identifiants.'
-    : authError
-    ? 'Impossible de se connecter au serveur RH. Veuillez vérifier votre connexion réseau.'
-    : null;
+  const handleChangePassword = async () => {
+    if (!newPassword || newPassword.length < 6) {
+      Alert.alert('Mot de passe trop court', 'Le nouveau mot de passe doit contenir au moins 6 caractères.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Erreur', 'Les deux mots de passe ne correspondent pas.');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await changePassword(newPassword, password);
+      Alert.alert('✅ Mot de passe mis à jour', 'Votre nouveau mot de passe a été enregistré avec succès.');
+      router.replace('/(tabs)');
+    } catch (err: any) {
+      Alert.alert('Erreur', err.message ?? 'Impossible de modifier le mot de passe.');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const formattedError =
+    authError === 'invalid_credentials' || authError?.includes('Identifiants')
+      ? 'Adresse e-mail ou mot de passe incorrect. Veuillez vérifier vos identifiants.'
+      : authError
+      ? 'Impossible de se connecter au serveur RH. Veuillez vérifier votre connexion réseau.'
+      : null;
 
   return (
     <LinearGradient colors={['#0f172a', '#1e1b4b', '#0f172a']} style={styles.gradient}>
@@ -140,6 +169,63 @@ export default function LoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Mandatory Change Password Modal */}
+      <Modal visible={mustChangePassword} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalIconCircle}>
+                <KeyRound color="#6366f1" size={24} />
+              </View>
+              <Text style={styles.modalTitle}>Changement de mot de passe obligatoire</Text>
+              <Text style={styles.modalSub}>
+                Bienvenue ! Il s'agit de votre première connexion. Veuillez définir votre mot de passe personnel sécurisé.
+              </Text>
+            </View>
+
+            <Text style={styles.fieldLabel}>Nouveau mot de passe *</Text>
+            <View style={styles.modalInputRow}>
+              <Lock color="#64748b" size={18} style={styles.inputIcon} />
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Au moins 6 caractères"
+                placeholderTextColor="#94a3b8"
+                secureTextEntry
+                value={newPassword}
+                onChangeText={setNewPassword}
+              />
+            </View>
+
+            <Text style={styles.fieldLabel}>Confirmer le mot de passe *</Text>
+            <View style={styles.modalInputRow}>
+              <Lock color="#64748b" size={18} style={styles.inputIcon} />
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Répéter le mot de passe"
+                placeholderTextColor="#94a3b8"
+                secureTextEntry
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={styles.modalSubmitBtn}
+              onPress={handleChangePassword}
+              disabled={isChangingPassword}
+            >
+              <LinearGradient colors={['#6366f1', '#4f46e5']} style={styles.modalSubmitGrad}>
+                {isChangingPassword ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Enregistrer le mot de passe</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </LinearGradient>
   );
 }
@@ -200,4 +286,27 @@ const styles = StyleSheet.create({
   loginGradient: { height: 52, alignItems: 'center', justifyContent: 'center' },
   loginBtnText: { color: '#ffffff', fontWeight: '800', fontSize: 16 },
   hint: { color: '#64748b', fontSize: 12, textAlign: 'center', marginTop: 18, lineHeight: 16 },
+
+  // Modal Change Password
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.75)', justifyContent: 'center', padding: 20 },
+  modalCard: { backgroundColor: '#ffffff', borderRadius: 24, padding: 24 },
+  modalHeader: { alignItems: 'center', marginBottom: 20 },
+  modalIconCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#e0e7ff', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: '#0f172a', textAlign: 'center' },
+  modalSub: { fontSize: 13, color: '#64748b', textAlign: 'center', marginTop: 6, lineHeight: 18 },
+  fieldLabel: { fontSize: 13, fontWeight: '700', color: '#334155', marginBottom: 6, marginTop: 10 },
+  modalInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    paddingHorizontal: 14,
+    height: 48,
+  },
+  modalInput: { flex: 1, color: '#0f172a', fontSize: 14 },
+  modalSubmitBtn: { borderRadius: 14, overflow: 'hidden', marginTop: 22 },
+  modalSubmitGrad: { height: 50, alignItems: 'center', justifyContent: 'center' },
+  modalSubmitText: { color: '#ffffff', fontWeight: '800', fontSize: 15 },
 });
