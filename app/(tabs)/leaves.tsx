@@ -73,10 +73,11 @@ export default function LeavesScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
 
-  // Date picker state
-  const today = new Date();
-  const [startDate, setStartDate] = useState<Date>(today);
-  const [endDate, setEndDate] = useState<Date>(today);
+  // Date picker state (default to tomorrow to prevent overlap with today's record)
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const [startDate, setStartDate] = useState<Date>(tomorrow);
+  const [endDate, setEndDate] = useState<Date>(tomorrow);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
 
@@ -158,7 +159,7 @@ export default function LeavesScreen() {
         router.replace('/login');
         return;
       }
-      Alert.alert('Erreur', 'Impossible de transmettre la demande. Veuillez réessayer.');
+      Alert.alert('Erreur', err.message ?? 'Impossible de transmettre la demande. Veuillez réessayer.');
     } finally {
       setIsSubmitting(false);
     }
