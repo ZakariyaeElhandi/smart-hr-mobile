@@ -23,10 +23,10 @@ interface Props {
 
 function timeAgo(date: Date): string {
   const diff = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (diff < 60) return 'just now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
+  if (diff < 60) return "À l'instant";
+  if (diff < 3600) return `Il y a ${Math.floor(diff / 60)} min`;
+  if (diff < 86400) return `Il y a ${Math.floor(diff / 3600)} h`;
+  return `Il y a ${Math.floor(diff / 86400)} j`;
 }
 
 export default function NotificationsModal({ visible, onClose, notifications, onMarkRead }: Props) {
@@ -36,7 +36,6 @@ export default function NotificationsModal({ visible, onClose, notifications, on
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
@@ -50,7 +49,7 @@ export default function NotificationsModal({ visible, onClose, notifications, on
             <View style={styles.headerRight}>
               {unread > 0 && (
                 <TouchableOpacity onPress={onMarkRead} style={styles.markReadBtn}>
-                  <Text style={styles.markReadText}>Mark all read</Text>
+                  <Text style={styles.markReadText}>Tout marquer lu</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -68,30 +67,30 @@ export default function NotificationsModal({ visible, onClose, notifications, on
             {notifications.length === 0 ? (
               <View style={styles.empty}>
                 <Info color="#94a3b8" size={40} />
-                <Text style={styles.emptyTitle}>All clear!</Text>
+                <Text style={styles.emptyTitle}>Tout est à jour !</Text>
                 <Text style={styles.emptyText}>
-                  You have no notifications yet. Leave request updates will appear here once your manager takes action.
+                  Vous n'avez aucune notification. L'avancement de vos demandes d'absence et réclamations apparaîtra ici.
                 </Text>
               </View>
             ) : (
               notifications.map((notif) => {
                 const isApproved = notif.type === 'approved';
-                const isRefused  = notif.type === 'refused';
+                const isRefused = notif.type === 'refused';
                 return (
-                  <View
-                    key={notif.id}
-                    style={[styles.card, !notif.read && styles.cardUnread]}
-                  >
-                    <View style={[
-                      styles.iconBox,
-                      isApproved ? styles.iconApproved : isRefused ? styles.iconRefused : styles.iconInfo,
-                    ]}>
-                      {isApproved
-                        ? <CheckCircle color="#16a34a" size={20} />
-                        : isRefused
-                        ? <XCircle color="#dc2626" size={20} />
-                        : <Info color="#2563eb" size={20} />
-                      }
+                  <View key={notif.id} style={[styles.card, !notif.read && styles.cardUnread]}>
+                    <View
+                      style={[
+                        styles.iconBox,
+                        isApproved ? styles.iconApproved : isRefused ? styles.iconRefused : styles.iconInfo,
+                      ]}
+                    >
+                      {isApproved ? (
+                        <CheckCircle color="#16a34a" size={20} />
+                      ) : isRefused ? (
+                        <XCircle color="#dc2626" size={20} />
+                      ) : (
+                        <Info color="#2563eb" size={20} />
+                      )}
                     </View>
                     <View style={styles.cardBody}>
                       <View style={styles.cardTop}>
@@ -107,7 +106,6 @@ export default function NotificationsModal({ visible, onClose, notifications, on
             )}
             <View style={{ height: 32 }} />
           </ScrollView>
-
         </Pressable>
       </Pressable>
     </Modal>
@@ -117,13 +115,13 @@ export default function NotificationsModal({ visible, onClose, notifications, on
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     paddingHorizontal: 20,
     paddingTop: 20,
     height: SCREEN_HEIGHT * 0.65,
@@ -140,17 +138,17 @@ const styles = StyleSheet.create({
   badge: {
     backgroundColor: '#ef4444',
     borderRadius: 99,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
-  badgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  badgeText: { color: '#ffffff', fontSize: 11, fontWeight: '800' },
   markReadBtn: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: '#e0e7ff',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
   },
-  markReadText: { color: '#2563eb', fontSize: 12, fontWeight: '700' },
+  markReadText: { color: '#4338ca', fontSize: 12, fontWeight: '700' },
   closeBtn: { backgroundColor: '#f1f5f9', padding: 8, borderRadius: 99 },
   list: { flex: 1 },
   listContent: { paddingBottom: 16 },
@@ -160,10 +158,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     gap: 12,
   },
-  emptyTitle: { fontSize: 17, fontWeight: '700', color: '#334155' },
+  emptyTitle: { fontSize: 17, fontWeight: '800', color: '#0f172a' },
   emptyText: {
-    fontSize: 14,
-    color: '#94a3b8',
+    fontSize: 13,
+    color: '#64748b',
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -175,9 +173,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     gap: 14,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: '#e2e8f0',
   },
-  cardUnread: { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' },
+  cardUnread: { backgroundColor: '#e0e7ff', borderColor: '#c7d2fe' },
   iconBox: {
     width: 42,
     height: 42,
@@ -187,7 +185,7 @@ const styles = StyleSheet.create({
   },
   iconApproved: { backgroundColor: '#dcfce7' },
   iconRefused: { backgroundColor: '#fee2e2' },
-  iconInfo: { backgroundColor: '#eff6ff' },
+  iconInfo: { backgroundColor: '#e0e7ff' },
   cardBody: { flex: 1 },
   cardTop: {
     flexDirection: 'row',
@@ -195,14 +193,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 4,
   },
-  cardTitle: { fontSize: 14, fontWeight: '700', color: '#0f172a', flex: 1 },
+  cardTitle: { fontSize: 14, fontWeight: '800', color: '#0f172a', flex: 1 },
   unreadDot: {
     width: 8,
     height: 8,
-    backgroundColor: '#2563eb',
+    backgroundColor: '#4f46e5',
     borderRadius: 99,
     marginLeft: 6,
   },
-  cardMessage: { fontSize: 13, color: '#64748b', lineHeight: 18 },
-  cardTime: { fontSize: 11, color: '#94a3b8', marginTop: 6, fontWeight: '600' },
+  cardMessage: { fontSize: 13, color: '#334155', lineHeight: 18 },
+  cardTime: { fontSize: 11, color: '#64748b', marginTop: 6, fontWeight: '600' },
 });

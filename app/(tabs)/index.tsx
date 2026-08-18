@@ -314,7 +314,7 @@ export default function MaPresenceScreen() {
         <View style={styles.readOnlyNotice}>
           <Info color="#4338ca" size={16} />
           <Text style={styles.readOnlyNoticeText}>
-            Les données ci-dessous proviennent du pointage physique Odoo (Lecture seule).
+            Les données ci-dessous correspondent au pointage officiel enregistré (Lecture seule).
           </Text>
         </View>
 

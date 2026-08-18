@@ -109,7 +109,7 @@ export default function DayDetailModal({ visible, onClose, data, onReportAnomaly
             <View style={styles.readOnlyBanner}>
               <Clock color="#6366f1" size={16} />
               <Text style={styles.readOnlyText}>
-                Données de pointage enregistrées dans Odoo (Lecture seule)
+                Données de présence enregistrées sur votre espace RH (Lecture seule)
               </Text>
             </View>
 

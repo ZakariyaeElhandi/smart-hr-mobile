@@ -281,7 +281,7 @@ export default function CalendarModal({ visible, onClose, title, marks, legend }
                       <View style={styles.warningBox}>
                         <AlertTriangle color="#dc2626" size={16} />
                         <Text style={styles.warningText}>
-                          No check-out recorded for this day. This may appear as an anomaly in Odoo.
+                          Aucun pointage de sortie enregistré pour cette journée.
                         </Text>
                       </View>
                     )}

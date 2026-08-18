@@ -61,7 +61,7 @@ export default function AnomalyModal({ visible, onClose, initialDate }: Props) {
 
       Alert.alert(
         '✅ Réclamation transmise',
-        'Votre signalement d\'anomalie a été transmis au service RH sur Odoo.'
+        'Votre signalement d\'anomalie a été transmis à l\'équipe RH.'
       );
       setComment('');
       setAttachmentName(null);

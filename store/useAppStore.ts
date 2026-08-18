@@ -66,7 +66,7 @@ interface AppState {
   // Notifications (in-app)
   notifications: Notification[];
 
-  // Appraisals / Performance (live from Odoo)
+  // Appraisals / Performance
   appraisals: AppraisalRecord[];
   appraisalDetail: AppraisalRecord | null;
 

@@ -34,14 +34,14 @@ export default function TabLayout() {
       <Tabs.Screen
         name="leaves"
         options={{
-          title: 'Time Off',
+          title: 'Congés & Absences',
           tabBarIcon: ({ color, size }) => <Calendar color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="performance"
         options={{
-          title: 'Performance',
+          title: 'Mon Bilan',
           tabBarIcon: ({ color, size }) => <TrendingUp color={color} size={size} />,
         }}
       />

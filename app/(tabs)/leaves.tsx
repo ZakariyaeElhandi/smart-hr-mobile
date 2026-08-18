@@ -1,35 +1,42 @@
+import React, { useCallback, useMemo, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Modal, ActivityIndicator, RefreshControl,
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  StyleSheet,
+  Alert,
+  Modal,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Plane, CheckCircle, XCircle, Clock, Plus, X, AlertTriangle, Calendar } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
-import type React from 'react';
+import { CheckCircle, XCircle, Clock, Plus, X, AlertTriangle, Calendar as CalendarIcon, Umbrella } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useAppStore, LeaveRequest } from '../../store/useAppStore';
 import { apiCreateLeave } from '../../utils/api';
 import CalendarModal, { DayMark } from '../../components/CalendarModal';
 import DatePickerModal from '../../components/DatePickerModal';
+import { Theme } from '../../constants/theme';
 
-// Map Odoo states → display-friendly status
-function mapStatus(state: string): 'Approved' | 'Pending' | 'Denied' {
-  if (state === 'validate' || state === 'Approved') return 'Approved';
-  if (state === 'refuse' || state === 'Denied') return 'Denied';
-  return 'Pending';
+// Map raw backend states → display-friendly French status
+function mapStatus(state: string): 'Approuvé' | 'En attente' | 'Refusé' {
+  if (state === 'validate' || state === 'Approved') return 'Approuvé';
+  if (state === 'refuse' || state === 'Denied') return 'Refusé';
+  return 'En attente';
 }
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; icon: React.ReactNode }> = {
-  Approved: { bg: '#dcfce7', text: '#15803d', icon: <CheckCircle color="#16a34a" size={18} /> },
-  Denied:   { bg: '#fee2e2', text: '#b91c1c', icon: <XCircle color="#dc2626" size={18} /> },
-  Pending:  { bg: '#fef9c3', text: '#92400e', icon: <Clock color="#d97706" size={18} /> },
+  Approuvé:  { bg: '#dcfce7', text: '#15803d', icon: <CheckCircle color="#16a34a" size={18} /> },
+  Refusé:    { bg: '#fee2e2', text: '#b91c1c', icon: <XCircle color="#dc2626" size={18} /> },
+  'En attente': { bg: '#fef9c3', text: '#854d0e', icon: <Clock color="#d97706" size={18} /> },
 };
 
-// Odoo leave type IDs — queried directly from the DB
 const LEAVE_TYPE_IDS: Record<string, number> = {
-  'Annual': 1,
-  'Sick':   2,
-  'Personal': 4,
+  'Congé Annuel': 1,
+  'Maladie': 2,
+  'Personnel': 4,
 };
 
 function dateToStr(d: Date): string {
@@ -42,7 +49,7 @@ function daysBetween(start: Date, end: Date): number {
 }
 
 export default function LeavesScreen() {
-  const { logout, setLeaveRequests, addLeaveRequest, leaveRequests, refreshData } = useAppStore();
+  const { logout, addLeaveRequest, leaveRequests, refreshData } = useAppStore();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,56 +63,63 @@ export default function LeavesScreen() {
   const [showEndPicker, setShowEndPicker] = useState(false);
 
   const [reason, setReason] = useState('');
-  const [type, setType] = useState<'Annual' | 'Sick' | 'Personal'>('Annual');
+  const [type, setType] = useState<'Congé Annuel' | 'Maladie' | 'Personnel'>('Congé Annuel');
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    try { await refreshData(); }
-    finally { setIsRefreshing(false); }
+    try {
+      await refreshData();
+    } finally {
+      setIsRefreshing(false);
+    }
   }, [refreshData]);
 
   const handleSubmit = async () => {
-    if (!reason) {
-      Alert.alert('Missing Fields', 'Please add a reason for your leave request.');
+    if (!reason.trim()) {
+      Alert.alert('Champs requis', 'Veuillez saisir le motif de votre demande de congé.');
       return;
     }
     if (endDate < startDate) {
-      Alert.alert('Invalid Dates', 'End date must be on or after the start date.');
+      Alert.alert('Dates invalides', 'La date de fin doit être égale ou postérieure à la date de début.');
       return;
     }
+
     setIsSubmitting(true);
     try {
-      const leaveTypeId = LEAVE_TYPE_IDS[type];
+      const leaveTypeId = LEAVE_TYPE_IDS[type] || 1;
       const created = await apiCreateLeave({
         holiday_status_id: leaveTypeId,
         date_from: dateToStr(startDate),
-        date_to:   dateToStr(endDate),
-        reason,
+        date_to: dateToStr(endDate),
+        reason: reason.trim(),
       });
+
       const newReq: LeaveRequest = {
         id: created.id,
         startDate: created.date_from?.split('T')[0] ?? dateToStr(startDate),
-        endDate:   created.date_to?.split('T')[0]   ?? dateToStr(endDate),
-        reason,
+        endDate: created.date_to?.split('T')[0] ?? dateToStr(endDate),
+        reason: reason.trim(),
         leaveType: type,
         status: created.state ?? 'confirm',
         numberOfDays: created.number_of_days,
         aiRecommendation: created.ai_recommendation,
       };
+
       addLeaveRequest(newReq);
       setShowModal(false);
       setReason('');
 
-      const aiMsg = created.ai_recommendation
-        ? `\n\nAI Recommendation: ${created.ai_recommendation}` : '';
-      Alert.alert('✅ Request Submitted', `Your leave request has been sent to Odoo.${aiMsg}`);
+      Alert.alert(
+        '✅ Demande transmise',
+        'Votre demande de congé a été enregistrée et transmise à l\'équipe RH.'
+      );
     } catch (err: any) {
       if (err.message === 'SESSION_EXPIRED') {
         await logout();
         router.replace('/login');
         return;
       }
-      Alert.alert('Error', err.message ?? 'Failed to submit request.');
+      Alert.alert('Erreur', 'Impossible de transmettre la demande. Veuillez réessayer.');
     } finally {
       setIsSubmitting(false);
     }
@@ -118,19 +132,17 @@ export default function LeavesScreen() {
     (r) => r.status === 'confirm' || r.status === 'Pending'
   ).length;
 
-  // Build calendar marks from leave requests
   const leaveMarks = useMemo<DayMark[]>(() => {
     const marks: DayMark[] = [];
     leaveRequests.forEach((req) => {
       if (!req.startDate || !req.endDate) return;
       const isApproved = req.status === 'validate' || req.status === 'Approved';
-      const isRefused  = req.status === 'refuse'   || req.status === 'Denied';
-      const color      = isApproved ? '#10b981' : isRefused ? '#ef4444' : '#f59e0b';
+      const isRefused = req.status === 'refuse' || req.status === 'Denied';
+      const color = isApproved ? '#10b981' : isRefused ? '#ef4444' : '#f59e0b';
 
-      // Mark every day in the range
       const start = new Date(req.startDate);
-      const end   = new Date(req.endDate);
-      const cur   = new Date(start);
+      const end = new Date(req.endDate);
+      const cur = new Date(start);
       while (cur <= end) {
         marks.push({ date: dateToStr(cur), color, label: req.leaveType });
         cur.setDate(cur.getDate() + 1);
@@ -143,32 +155,36 @@ export default function LeavesScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <LinearGradient colors={['#4f46e5', '#7c3aed']} style={styles.header}>
-        <Text style={styles.headerTitle}>Time Off</Text>
-        <Text style={styles.headerSub}>Plan and manage your leaves</Text>
+      {/* Top Header */}
+      <LinearGradient colors={['#1a1a2e', '#16213e']} style={styles.header}>
+        <Text style={styles.headerTitle}>Congés & Absences</Text>
+        <Text style={styles.headerSub}>Gérez et suivez l'ensemble de vos demandes d'absence</Text>
 
-        {/* Balance Card */}
+        {/* Overview Balance Card */}
         <View style={styles.balanceCard}>
           <View style={styles.balanceRow}>
             <View>
-              <Text style={styles.balanceLabel}>LEAVE REQUESTS</Text>
+              <Text style={styles.balanceLabel}>DEMANDES D'ABSENCE</Text>
               <Text style={styles.balanceDays}>{leaveRequests.length} total</Text>
             </View>
-            <Plane color="#4f46e5" size={40} />
+            <View style={styles.iconCircle}>
+              <Umbrella color="#6366f1" size={32} />
+            </View>
           </View>
           <View style={styles.divider} />
           <View style={styles.balanceBreakdown}>
-            {[
-              { label: 'Approved', val: approvedCount, color: '#15803d' },
-              { label: 'Pending',  val: pendingCount,  color: '#d97706' },
-              { label: 'Total',    val: leaveRequests.length, color: '#6d28d9' },
-            ].map((item) => (
-              <View key={item.label} style={styles.balanceStat}>
-                <Text style={[styles.balanceStatVal, { color: item.color }]}>{item.val}</Text>
-                <Text style={styles.balanceStatLabel}>{item.label}</Text>
-              </View>
-            ))}
+            <View style={styles.balanceStat}>
+              <Text style={[styles.balanceStatVal, { color: '#15803d' }]}>{approvedCount}</Text>
+              <Text style={styles.balanceStatLabel}>Approuvées</Text>
+            </View>
+            <View style={styles.balanceStat}>
+              <Text style={[styles.balanceStatVal, { color: '#b45309' }]}>{pendingCount}</Text>
+              <Text style={styles.balanceStatLabel}>En attente</Text>
+            </View>
+            <View style={styles.balanceStat}>
+              <Text style={[styles.balanceStatVal, { color: '#6366f1' }]}>{leaveRequests.length}</Text>
+              <Text style={styles.balanceStatLabel}>Total</Text>
+            </View>
           </View>
         </View>
       </LinearGradient>
@@ -189,25 +205,25 @@ export default function LeavesScreen() {
         <View style={styles.section}>
           <View style={styles.actionRow}>
             <TouchableOpacity style={styles.newRequestBtn} onPress={() => setShowModal(true)}>
-              <LinearGradient colors={['#4f46e5', '#7c3aed']} style={styles.newRequestGrad}>
+              <LinearGradient colors={['#6366f1', '#4f46e5']} style={styles.newRequestGrad}>
                 <Plus color="#fff" size={20} />
-                <Text style={styles.newRequestText}>Request Time Off</Text>
+                <Text style={styles.newRequestText}>Nouvelle Demande</Text>
               </LinearGradient>
             </TouchableOpacity>
             <TouchableOpacity style={styles.calBtn} onPress={() => setShowCalendar(true)}>
-              <Calendar color="#4f46e5" size={22} />
+              <CalendarIcon color="#6366f1" size={22} />
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Requests List */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>All Requests</Text>
+          <Text style={styles.sectionTitle}>Historique des Demandes</Text>
           {leaveRequests.length === 0 ? (
             <View style={styles.emptyState}>
-              <Plane color="#cbd5e1" size={48} />
-              <Text style={styles.emptyText}>No leave requests yet</Text>
-              <Text style={styles.emptySubtext}>Your Odoo leave history will appear here</Text>
+              <Umbrella color="#cbd5e1" size={48} />
+              <Text style={styles.emptyText}>Aucune demande de congé</Text>
+              <Text style={styles.emptySubtext}>Vos demandes d'absence apparaîtront ici</Text>
             </View>
           ) : (
             leaveRequests.map((req) => {
@@ -219,15 +235,15 @@ export default function LeavesScreen() {
                     {s.icon}
                   </View>
                   <View style={styles.reqBody}>
-                    <Text style={styles.reqReason}>{req.leaveType || req.reason || 'Leave'}</Text>
+                    <Text style={styles.reqReason}>{req.leaveType || req.reason || 'Demande de congé'}</Text>
                     <Text style={styles.reqDates}>
                       {req.startDate} → {req.endDate}
-                      {req.numberOfDays ? `  (${req.numberOfDays}d)` : ''}
+                      {req.numberOfDays ? `  (${req.numberOfDays} j)` : ''}
                     </Text>
                     {req.aiRecommendation && (
                       <View style={styles.aiBadge}>
                         <AlertTriangle color="#d97706" size={12} />
-                        <Text style={styles.aiText}>AI: {req.aiRecommendation}</Text>
+                        <Text style={styles.aiText}>Analyse RH : {req.aiRecommendation}</Text>
                       </View>
                     )}
                   </View>
@@ -246,12 +262,12 @@ export default function LeavesScreen() {
       <CalendarModal
         visible={showCalendar}
         onClose={() => setShowCalendar(false)}
-        title="Leave Calendar"
+        title="Planning des Congés"
         marks={leaveMarks}
         legend={[
-          { color: '#10b981', label: 'Approved' },
-          { color: '#f59e0b', label: 'Pending' },
-          { color: '#ef4444', label: 'Refused' },
+          { color: '#10b981', label: 'Approuvé' },
+          { color: '#f59e0b', label: 'En attente' },
+          { color: '#ef4444', label: 'Refusé' },
         ]}
       />
 
@@ -259,7 +275,7 @@ export default function LeavesScreen() {
       <DatePickerModal
         visible={showStartPicker}
         onClose={() => setShowStartPicker(false)}
-        label="Start Date"
+        label="Date de début"
         value={startDate}
         onChange={(d) => {
           setStartDate(d);
@@ -269,7 +285,7 @@ export default function LeavesScreen() {
       <DatePickerModal
         visible={showEndPicker}
         onClose={() => setShowEndPicker(false)}
-        label="End Date"
+        label="Date de fin"
         value={endDate}
         onChange={setEndDate}
         minimumDate={startDate}
@@ -280,16 +296,16 @@ export default function LeavesScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>New Leave Request</Text>
+              <Text style={styles.modalTitle}>Nouvelle Demande de Congé</Text>
               <TouchableOpacity onPress={() => setShowModal(false)} style={styles.modalClose}>
                 <X color="#64748b" size={22} />
               </TouchableOpacity>
             </View>
 
             {/* Type Chips */}
-            <Text style={styles.fieldLabel}>Leave Type</Text>
+            <Text style={styles.fieldLabel}>Type d'absence</Text>
             <View style={styles.typeRow}>
-              {(['Annual', 'Sick', 'Personal'] as const).map((t) => (
+              {(['Congé Annuel', 'Maladie', 'Personnel'] as const).map((t) => (
                 <TouchableOpacity
                   key={t}
                   onPress={() => setType(t)}
@@ -301,30 +317,30 @@ export default function LeavesScreen() {
             </View>
 
             {/* Date pickers */}
-            <Text style={styles.fieldLabel}>Start Date</Text>
+            <Text style={styles.fieldLabel}>Date de début</Text>
             <TouchableOpacity style={styles.dateField} onPress={() => setShowStartPicker(true)}>
-              <Calendar color="#6366f1" size={16} />
+              <CalendarIcon color="#6366f1" size={18} />
               <Text style={styles.dateFieldText}>{dateToStr(startDate)}</Text>
             </TouchableOpacity>
 
-            <Text style={styles.fieldLabel}>End Date</Text>
+            <Text style={styles.fieldLabel}>Date de fin</Text>
             <TouchableOpacity style={styles.dateField} onPress={() => setShowEndPicker(true)}>
-              <Calendar color="#6366f1" size={16} />
+              <CalendarIcon color="#6366f1" size={18} />
               <Text style={styles.dateFieldText}>{dateToStr(endDate)}</Text>
             </TouchableOpacity>
 
             {/* Days count preview */}
             <View style={styles.daysBadge}>
               <Text style={styles.daysBadgeText}>
-                {daysRequested} day{daysRequested !== 1 ? 's' : ''} requested
+                {daysRequested} jour{daysRequested > 1 ? 's' : ''} demandé{daysRequested > 1 ? 's' : ''}
               </Text>
             </View>
 
             {/* Reason */}
-            <Text style={styles.fieldLabel}>Reason</Text>
+            <Text style={styles.fieldLabel}>Motif de l'absence *</Text>
             <TextInput
               style={[styles.input, styles.inputMulti]}
-              placeholder="Briefly explain your reason..."
+              placeholder="Saisissez une brève explication..."
               placeholderTextColor="#94a3b8"
               multiline
               value={reason}
@@ -332,11 +348,11 @@ export default function LeavesScreen() {
             />
 
             <TouchableOpacity onPress={handleSubmit} disabled={isSubmitting}>
-              <LinearGradient colors={['#4f46e5', '#7c3aed']} style={styles.submitBtn}>
+              <LinearGradient colors={['#6366f1', '#4f46e5']} style={styles.submitBtn}>
                 {isSubmitting ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.submitBtnText}>Submit to Odoo</Text>
+                  <Text style={styles.submitBtnText}>Transmettre la demande</Text>
                 )}
               </LinearGradient>
             </TouchableOpacity>
@@ -351,56 +367,69 @@ export default function LeavesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
-  header: { paddingTop: 56, paddingHorizontal: 20, paddingBottom: 100 },
-  headerTitle: { color: '#fff', fontSize: 28, fontWeight: '800' },
-  headerSub: { color: 'rgba(255,255,255,0.6)', fontSize: 14, marginTop: 4 },
-  balanceCard: { backgroundColor: '#fff', borderRadius: 20, padding: 20, marginTop: 20, shadowColor: '#4f46e5', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 8 },
+  header: { paddingTop: 52, paddingHorizontal: 20, paddingBottom: 90 },
+  headerTitle: { color: '#ffffff', fontSize: 26, fontWeight: '800' },
+  headerSub: { color: '#94a3b8', fontSize: 13, marginTop: 4, fontWeight: '500' },
+  balanceCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 20,
+    marginTop: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
+  },
   balanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  balanceLabel: { color: '#94a3b8', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  balanceDays: { color: '#0f172a', fontSize: 36, fontWeight: '800', marginTop: 4 },
+  balanceLabel: { color: '#94a3b8', fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
+  balanceDays: { color: '#0f172a', fontSize: 32, fontWeight: '800', marginTop: 4 },
+  iconCircle: { width: 54, height: 54, borderRadius: 99, backgroundColor: '#e0e7ff', alignItems: 'center', justifyContent: 'center' },
   divider: { height: 1, backgroundColor: '#f1f5f9', marginVertical: 16 },
   balanceBreakdown: { flexDirection: 'row', justifyContent: 'space-around' },
   balanceStat: { alignItems: 'center' },
   balanceStatVal: { fontSize: 20, fontWeight: '800' },
-  balanceStatLabel: { color: '#94a3b8', fontSize: 11, marginTop: 2 },
-  scroll: { flex: 1, marginTop: -60 },
+  balanceStatLabel: { color: '#64748b', fontSize: 11, marginTop: 2, fontWeight: '600' },
+
+  scroll: { flex: 1, marginTop: -50 },
   section: { paddingHorizontal: 20, marginTop: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#0f172a', marginBottom: 12 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#0f172a', marginBottom: 12 },
   actionRow: { flexDirection: 'row', gap: 12 },
   newRequestBtn: { flex: 1, borderRadius: 16, overflow: 'hidden' },
-  newRequestGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16 },
-  newRequestText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  calBtn: { backgroundColor: '#fff', width: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 },
-  emptyState: { alignItems: 'center', paddingVertical: 48 },
-  emptyText: { color: '#64748b', fontSize: 16, fontWeight: '700', marginTop: 16 },
-  emptySubtext: { color: '#94a3b8', fontSize: 13, marginTop: 6 },
-  reqCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  newRequestGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 15 },
+  newRequestText: { color: '#ffffff', fontWeight: '800', fontSize: 15 },
+  calBtn: { backgroundColor: '#ffffff', width: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
+  emptyState: { alignItems: 'center', paddingVertical: 40 },
+  emptyText: { color: '#0f172a', fontSize: 16, fontWeight: '800', marginTop: 16 },
+  emptySubtext: { color: '#94a3b8', fontSize: 13, marginTop: 4 },
+  reqCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 16, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' },
   reqIconBox: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
   reqBody: { flex: 1 },
-  reqReason: { fontSize: 14, fontWeight: '700', color: '#0f172a' },
-  reqDates: { fontSize: 12, color: '#94a3b8', marginTop: 3 },
-  aiBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 },
+  reqReason: { fontSize: 14, fontWeight: '800', color: '#0f172a' },
+  reqDates: { fontSize: 12, color: '#64748b', marginTop: 4, fontWeight: '600' },
+  aiBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
   aiText: { fontSize: 11, color: '#d97706', fontWeight: '600' },
   reqBadge: { borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4 },
-  reqBadgeText: { fontSize: 11, fontWeight: '700' },
+  reqBadgeText: { fontSize: 11, fontWeight: '800' },
+
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'flex-end' },
+  modalCard: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '90%' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  modalTitle: { fontSize: 20, fontWeight: '800', color: '#0f172a' },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: '#0f172a' },
   modalClose: { backgroundColor: '#f1f5f9', padding: 8, borderRadius: 99 },
-  fieldLabel: { fontSize: 13, fontWeight: '700', color: '#475569', marginBottom: 8, marginTop: 14 },
-  typeRow: { flexDirection: 'row', gap: 10 },
-  typeChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 99, backgroundColor: '#f1f5f9', borderWidth: 1.5, borderColor: '#e2e8f0' },
-  typeChipActive: { backgroundColor: '#ede9fe', borderColor: '#7c3aed' },
+  fieldLabel: { fontSize: 13, fontWeight: '700', color: '#334155', marginBottom: 8, marginTop: 12 },
+  typeRow: { flexDirection: 'row', gap: 8 },
+  typeChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, backgroundColor: '#f1f5f9', borderWidth: 1.5, borderColor: '#e2e8f0' },
+  typeChipActive: { backgroundColor: '#e0e7ff', borderColor: '#6366f1' },
   typeChipText: { color: '#64748b', fontWeight: '600', fontSize: 13 },
-  typeChipTextActive: { color: '#7c3aed' },
-  dateField: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f8fafc', borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 12, padding: 14 },
-  dateFieldText: { fontSize: 15, color: '#0f172a', fontWeight: '600' },
-  daysBadge: { backgroundColor: '#ede9fe', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14, alignSelf: 'flex-start', marginTop: 10 },
-  daysBadgeText: { color: '#6d28d9', fontWeight: '700', fontSize: 13 },
-  input: { backgroundColor: '#f8fafc', borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 12, padding: 14, fontSize: 14, color: '#0f172a' },
+  typeChipTextActive: { color: '#4338ca', fontWeight: '800' },
+  dateField: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 14 },
+  dateFieldText: { fontSize: 15, color: '#0f172a', fontWeight: '700' },
+  daysBadge: { backgroundColor: '#e0e7ff', borderRadius: 10, paddingVertical: 6, paddingHorizontal: 12, alignSelf: 'flex-start', marginTop: 10 },
+  daysBadgeText: { color: '#3730a3', fontWeight: '800', fontSize: 12 },
+  input: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 14, fontSize: 14, color: '#0f172a' },
   inputMulti: { height: 80, textAlignVertical: 'top' },
-  submitBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 20 },
-  submitBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  submitBtn: { borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 20 },
+  submitBtnText: { color: '#ffffff', fontWeight: '800', fontSize: 15 },
 });
