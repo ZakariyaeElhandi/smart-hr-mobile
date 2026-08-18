@@ -25,16 +25,16 @@ import {
   AlertTriangle,
   Calendar as CalendarIcon,
   Umbrella,
-  FileText,
   Upload,
-  Check,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
 } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { router } from 'expo-router';
 import { useAppStore, LeaveRequest } from '../../store/useAppStore';
 import { apiCreateLeave } from '../../utils/api';
 import CalendarModal, { DayMark } from '../../components/CalendarModal';
-import DatePickerModal from '../../components/DatePickerModal';
 
 // Map raw backend states → display-friendly French status
 function mapStatus(state: string): 'Approuvé' | 'En attente' | 'Refusé' {
@@ -58,7 +58,15 @@ const LEAVE_TYPES = [
 ] as const;
 
 function dateToStr(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function formatDateFr(d: Date): string {
+  const options: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric', month: 'short' };
+  return d.toLocaleDateString('fr-FR', options);
 }
 
 function daysBetween(start: Date, end: Date): number {
@@ -73,19 +81,31 @@ export default function LeavesScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
 
-  // Date picker state (default to tomorrow to prevent overlap with today's record)
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const [startDate, setStartDate] = useState<Date>(tomorrow);
-  const [endDate, setEndDate] = useState<Date>(tomorrow);
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+  // Date state setup
+  const getTomorrow = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d;
+  };
+
+  const [startDate, setStartDate] = useState<Date>(getTomorrow());
+  const [endDate, setEndDate] = useState<Date>(getTomorrow());
+  const [activeDateTab, setActiveDateTab] = useState<'start' | 'end' | null>(null);
 
   const [reason, setReason] = useState('');
   const [selectedType, setSelectedType] = useState<typeof LEAVE_TYPES[number]>(LEAVE_TYPES[0]);
-
-  // Attachment / Proof state
   const [attachmentName, setAttachmentName] = useState<string | null>(null);
+
+  const openNewRequestModal = () => {
+    const tmr = getTomorrow();
+    setStartDate(tmr);
+    setEndDate(tmr);
+    setReason('');
+    setAttachmentName(null);
+    setIsSubmitting(false);
+    setActiveDateTab(null);
+    setShowModal(true);
+  };
 
   const handlePickDocument = async () => {
     try {
@@ -109,6 +129,32 @@ export default function LeavesScreen() {
       setIsRefreshing(false);
     }
   }, [refreshData]);
+
+  // Adjust date helpers
+  const adjustStartDate = (days: number) => {
+    const next = new Date(startDate);
+    next.setDate(next.getDate() + days);
+    setStartDate(next);
+    if (next > endDate) {
+      setEndDate(next);
+    }
+  };
+
+  const adjustEndDate = (days: number) => {
+    const next = new Date(endDate);
+    next.setDate(next.getDate() + days);
+    if (next < startDate) {
+      setEndDate(startDate);
+    } else {
+      setEndDate(next);
+    }
+  };
+
+  const setDurationDays = (duration: number) => {
+    const nextEnd = new Date(startDate);
+    nextEnd.setDate(nextEnd.getDate() + (duration - 1));
+    setEndDate(nextEnd);
+  };
 
   const handleSubmit = async () => {
     if (!reason.trim()) {
@@ -246,7 +292,7 @@ export default function LeavesScreen() {
           {/* Action Buttons */}
           <View style={styles.section}>
             <View style={styles.actionRow}>
-              <TouchableOpacity style={styles.newRequestBtn} onPress={() => setShowModal(true)}>
+              <TouchableOpacity style={styles.newRequestBtn} onPress={openNewRequestModal} activeOpacity={0.8}>
                 <LinearGradient colors={['#6366f1', '#4f46e5']} style={styles.newRequestGrad}>
                   <Plus color="#fff" size={20} />
                   <Text style={styles.newRequestText}>Nouvelle Demande</Text>
@@ -316,26 +362,6 @@ export default function LeavesScreen() {
           ]}
         />
 
-        {/* Date Pickers */}
-        <DatePickerModal
-          visible={showStartPicker}
-          onClose={() => setShowStartPicker(false)}
-          label="Date de début"
-          value={startDate}
-          onChange={(d) => {
-            setStartDate(d);
-            if (d > endDate) setEndDate(d);
-          }}
-        />
-        <DatePickerModal
-          visible={showEndPicker}
-          onClose={() => setShowEndPicker(false)}
-          label="Date de fin"
-          value={endDate}
-          onChange={setEndDate}
-          minimumDate={startDate}
-        />
-
         {/* Request Modal */}
         <Modal visible={showModal} animationType="slide" transparent onRequestClose={() => setShowModal(false)}>
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -372,29 +398,83 @@ export default function LeavesScreen() {
                       })}
                     </ScrollView>
 
-                    {/* Date pickers */}
-                    <View style={styles.dateRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.fieldLabel}>Date de début *</Text>
-                        <TouchableOpacity style={styles.dateField} onPress={() => setShowStartPicker(true)}>
-                          <CalendarIcon color="#6366f1" size={18} />
-                          <Text style={styles.dateFieldText}>{dateToStr(startDate)}</Text>
-                        </TouchableOpacity>
+                    {/* Inline Date Selectors */}
+                    <Text style={styles.fieldLabel}>Période du congé *</Text>
+
+                    {/* Start Date Box */}
+                    <View style={styles.dateControlCard}>
+                      <View style={styles.dateControlHeader}>
+                        <Text style={styles.dateControlRole}>DATE DE DÉBUT</Text>
+                        <Text style={styles.dateControlFormatted}>{formatDateFr(startDate)}</Text>
+                        <Text style={styles.dateControlIso}>{dateToStr(startDate)}</Text>
                       </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.fieldLabel}>Date de fin *</Text>
-                        <TouchableOpacity style={styles.dateField} onPress={() => setShowEndPicker(true)}>
-                          <CalendarIcon color="#6366f1" size={18} />
-                          <Text style={styles.dateFieldText}>{dateToStr(endDate)}</Text>
+                      <View style={styles.stepperRow}>
+                        <TouchableOpacity style={styles.stepBtn} onPress={() => adjustStartDate(-1)}>
+                          <ChevronLeft color="#4f46e5" size={20} />
+                          <Text style={styles.stepBtnText}>- 1j</Text>
+                        </TouchableOpacity>
+
+                        <View style={styles.quickShortcuts}>
+                          <TouchableOpacity style={styles.shortcutChip} onPress={() => setStartDate(getTomorrow())}>
+                            <Text style={styles.shortcutText}>Demain</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.shortcutChip}
+                            onPress={() => {
+                              const nextMon = new Date();
+                              nextMon.setDate(nextMon.getDate() + ((1 + 7 - nextMon.getDay()) % 7 || 7));
+                              setStartDate(nextMon);
+                              if (nextMon > endDate) setEndDate(nextMon);
+                            }}
+                          >
+                            <Text style={styles.shortcutText}>Lundi pro.</Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        <TouchableOpacity style={styles.stepBtn} onPress={() => adjustStartDate(1)}>
+                          <Text style={styles.stepBtnText}>+ 1j</Text>
+                          <ChevronRight color="#4f46e5" size={20} />
                         </TouchableOpacity>
                       </View>
                     </View>
 
-                    {/* Days count preview */}
+                    {/* End Date Box */}
+                    <View style={[styles.dateControlCard, { marginTop: 10 }]}>
+                      <View style={styles.dateControlHeader}>
+                        <Text style={styles.dateControlRole}>DATE DE FIN</Text>
+                        <Text style={styles.dateControlFormatted}>{formatDateFr(endDate)}</Text>
+                        <Text style={styles.dateControlIso}>{dateToStr(endDate)}</Text>
+                      </View>
+                      <View style={styles.stepperRow}>
+                        <TouchableOpacity style={styles.stepBtn} onPress={() => adjustEndDate(-1)}>
+                          <ChevronLeft color="#4f46e5" size={20} />
+                          <Text style={styles.stepBtnText}>- 1j</Text>
+                        </TouchableOpacity>
+
+                        <View style={styles.quickShortcuts}>
+                          <TouchableOpacity style={styles.shortcutChip} onPress={() => setDurationDays(1)}>
+                            <Text style={styles.shortcutText}>1 Jour</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={styles.shortcutChip} onPress={() => setDurationDays(3)}>
+                            <Text style={styles.shortcutText}>3 Jours</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={styles.shortcutChip} onPress={() => setDurationDays(5)}>
+                            <Text style={styles.shortcutText}>1 Semaine</Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        <TouchableOpacity style={styles.stepBtn} onPress={() => adjustEndDate(1)}>
+                          <Text style={styles.stepBtnText}>+ 1j</Text>
+                          <ChevronRight color="#4f46e5" size={20} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {/* Days count preview badge */}
                     <View style={styles.daysBadge}>
-                      <Clock color="#4338ca" size={14} />
+                      <Clock color="#4338ca" size={16} />
                       <Text style={styles.daysBadgeText}>
-                        {daysRequested} jour{daysRequested > 1 ? 's' : ''} demandé{daysRequested > 1 ? 's' : ''}
+                        Durée calculée : <Text style={{ fontSize: 15, fontWeight: '900' }}>{daysRequested} jour{daysRequested > 1 ? 's' : ''}</Text>
                       </Text>
                     </View>
 
@@ -422,12 +502,12 @@ export default function LeavesScreen() {
                       onChangeText={setReason}
                     />
 
-                    <TouchableOpacity onPress={handleSubmit} disabled={isSubmitting}>
+                    <TouchableOpacity onPress={handleSubmit} disabled={isSubmitting} activeOpacity={0.85}>
                       <LinearGradient colors={['#6366f1', '#4f46e5']} style={styles.submitBtn}>
                         {isSubmitting ? (
                           <ActivityIndicator color="#fff" />
                         ) : (
-                          <Text style={styles.submitBtnText}>Transmettre la demande</Text>
+                          <Text style={styles.submitBtnText}>Transmettre la demande ({daysRequested}j)</Text>
                         )}
                       </LinearGradient>
                     </TouchableOpacity>
@@ -492,24 +572,35 @@ const styles = StyleSheet.create({
   reqBadge: { borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4 },
   reqBadgeText: { fontSize: 11, fontWeight: '800' },
 
-  // Modal & Keyboard Avoiding
+  // Modal & Date Selector
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'flex-end' },
-  modalKeyboardAvoiding: { width: '100%', maxHeight: '90%' },
+  modalKeyboardAvoiding: { width: '100%', maxHeight: '92%' },
   modalCard: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '100%' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 18, fontWeight: '800', color: '#0f172a' },
   modalClose: { backgroundColor: '#f1f5f9', padding: 8, borderRadius: 99 },
-  fieldLabel: { fontSize: 13, fontWeight: '700', color: '#334155', marginBottom: 8, marginTop: 12 },
+  fieldLabel: { fontSize: 13, fontWeight: '700', color: '#334155', marginBottom: 8, marginTop: 14 },
   typeScroll: { flexDirection: 'row', marginBottom: 6 },
   typeChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, backgroundColor: '#f1f5f9', borderWidth: 1.5, borderColor: '#e2e8f0', marginRight: 8 },
   typeChipActive: { backgroundColor: '#e0e7ff', borderColor: '#6366f1' },
   typeChipText: { color: '#64748b', fontWeight: '600', fontSize: 13 },
   typeChipTextActive: { color: '#4338ca', fontWeight: '800' },
-  dateRow: { flexDirection: 'row', gap: 12 },
-  dateField: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12 },
-  dateFieldText: { fontSize: 14, color: '#0f172a', fontWeight: '700' },
-  daysBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#e0e7ff', borderRadius: 10, paddingVertical: 6, paddingHorizontal: 12, alignSelf: 'flex-start', marginTop: 12 },
-  daysBadgeText: { color: '#3730a3', fontWeight: '800', fontSize: 12 },
+
+  // Inline Date Control Card
+  dateControlCard: { backgroundColor: '#f8fafc', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', padding: 14 },
+  dateControlHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  dateControlRole: { fontSize: 11, fontWeight: '800', color: '#6366f1', letterSpacing: 0.5 },
+  dateControlFormatted: { fontSize: 14, fontWeight: '800', color: '#0f172a' },
+  dateControlIso: { fontSize: 12, fontWeight: '600', color: '#64748b' },
+  stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  stepBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#e0e7ff', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
+  stepBtnText: { color: '#3730a3', fontWeight: '800', fontSize: 13 },
+  quickShortcuts: { flexDirection: 'row', gap: 6, flex: 1, justifyContent: 'center' },
+  shortcutChip: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1', paddingHorizontal: 8, paddingVertical: 6 },
+  shortcutText: { fontSize: 11, color: '#334155', fontWeight: '700' },
+
+  daysBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#e0e7ff', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14, marginTop: 14 },
+  daysBadgeText: { color: '#3730a3', fontWeight: '700', fontSize: 13 },
   uploadBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f8fafc', borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#818cf8', borderRadius: 12, padding: 14 },
   uploadText: { fontSize: 13, color: '#4338ca', fontWeight: '600' },
   input: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 14, fontSize: 14, color: '#0f172a' },
