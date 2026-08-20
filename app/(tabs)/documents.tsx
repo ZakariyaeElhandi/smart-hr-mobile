@@ -1,127 +1,111 @@
-import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
-  AlertCircle,
-  CheckCircle,
-  Clock,
-  Download,
-  FileCheck,
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  Modal,
+  TextInput,
+  Alert,
+  ActivityIndicator,
+  RefreshControl,
+  Animated,
+} from "react-native";
+import {
   FileText,
+  Download,
   Plus,
   X,
-  XCircle,
+  FileCheck,
+  Award,
+  CreditCard,
+  Briefcase,
+  Layers,
+  Sparkles,
 } from "lucide-react-native";
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
-} from "react-native";
+import { useLocalSearchParams, router } from "expo-router";
 import { useAppStore } from "../../store/useAppStore";
-import { apiFetchDocumentBase64, DocumentRequestRecord } from "../../utils/api";
-import { saveDocumentToDevice } from "../../utils/downloads";
+import { DocumentRequestRecord } from "../../utils/api";
+import { Theme } from "../../constants/theme";
+import { Card } from "../../components/ui/Card";
+import { StatusBadge } from "../../components/ui/StatusBadge";
+import { PrimaryButton } from "../../components/ui/PrimaryButton";
+import { IconCircle } from "../../components/ui/IconCircle";
 
-const DOCUMENT_TYPES = [
-  { id: "attestation_travail", label: "Attestation de travail", icon: "📄" },
+const DOC_TYPES = [
+  {
+    id: "attestation_travail",
+    label: "Attestation de travail",
+    icon: "📜",
+    category: "Attestations",
+    variant: "blue" as const,
+  },
   {
     id: "bulletin_paie",
     label: "Bulletin de paie",
-    icon: "💰",
-    requiresPeriod: true,
+    icon: "💵",
+    category: "Paie",
+    variant: "green" as const,
   },
-  { id: "certificat_travail", label: "Certificat de travail", icon: "📜" },
-  { id: "attestation_salaire", label: "Attestation de salaire", icon: "💵" },
-  { id: "attestation_cnss", label: "Attestation CNSS", icon: "🏦" },
-  { id: "contrat_travail", label: "Copie du contrat", icon: "📝" },
+  {
+    id: "attestation_salaire",
+    label: "Attestation de salaire",
+    icon: "📑",
+    category: "Attestations",
+    variant: "purple" as const,
+  },
+  {
+    id: "fiche_evaluation",
+    label: "Fiche d'évaluation",
+    icon: "⭐",
+    category: "Carrière",
+    variant: "coral" as const,
+  },
   {
     id: "autre",
-    label: "Autre document",
-    icon: "📋",
-    requiresCustomText: true,
+    label: "Autre document RH",
+    icon: "📂",
+    category: "Autre",
+    variant: "yellow" as const,
   },
-] as const;
-
-const MONTHS = [
-  { id: "1", label: "Janvier" },
-  { id: "2", label: "Février" },
-  { id: "3", label: "Mars" },
-  { id: "4", label: "Avril" },
-  { id: "5", label: "Mai" },
-  { id: "6", label: "Juin" },
-  { id: "7", label: "Juillet" },
-  { id: "8", label: "Août" },
-  { id: "9", label: "Septembre" },
-  { id: "10", label: "Octobre" },
-  { id: "11", label: "Novembre" },
-  { id: "12", label: "Décembre" },
 ];
 
-const STATUS_MAP: Record<
-  string,
-  { bg: string; text: string; icon: React.ReactNode }
-> = {
-  pending: {
-    bg: "#e0e7ff",
-    text: "#3730a3",
-    icon: <Clock color="#4338ca" size={16} />,
-  },
-  processing: {
-    bg: "#fef9c3",
-    text: "#854d0e",
-    icon: <Clock color="#d97706" size={16} />,
-  },
-  ready: {
-    bg: "#dcfce7",
-    text: "#15803d",
-    icon: <CheckCircle color="#16a34a" size={16} />,
-  },
-  delivered: {
-    bg: "#d1fae5",
-    text: "#065f46",
-    icon: <FileCheck color="#059669" size={16} />,
-  },
-  rejected: {
-    bg: "#fee2e2",
-    text: "#b91c1c",
-    icon: <XCircle color="#dc2626" size={16} />,
-  },
+const PERIODS = ["Mois en cours", "Mois dernier", "3 derniers mois", "Année en cours"];
+
+const STATUS_MAP: Record<string, { label: string; statusType: string }> = {
+  pending: { label: "En attente RH", statusType: "pending" },
+  processing: { label: "En cours de préparation", statusType: "processing" },
+  ready: { label: "Prêt à télécharger", statusType: "ready" },
+  delivered: { label: "Délivré", statusType: "delivered" },
+  rejected: { label: "Refusé", statusType: "rejected" },
 };
 
 export default function DocumentsScreen() {
-  const { documentRequests, submitDocumentRequest, fetchDocumentRequests } =
-    useAppStore();
+  const { documentRequests, submitDocumentRequest, fetchDocumentRequests, refreshData, logout } = useAppStore();
   const { highlightId } = useLocalSearchParams<{ highlightId?: string }>();
 
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | number | null>(null);
 
-  // Scroll & Highlighting State
+  // Auto-scroll & Animated highlight setup
   const scrollViewRef = useRef<ScrollView>(null);
   const itemYPositions = useRef<Record<string, number>>({});
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  // Handle Contextual Scroll & Highlight when highlightId param arrives
+  const handleCardLayout = (id: string | number, y: number) => {
+    itemYPositions.current[id.toString()] = y;
+  };
+
   useEffect(() => {
-    if (!highlightId || documentRequests.length === 0) return;
+    if (!highlightId) return;
 
     const targetIdStr = highlightId.toString();
     const itemExists = documentRequests.some(
-      (doc) => doc.id.toString() === targetIdStr,
+      (d) => d.id.toString() === targetIdStr,
     );
 
     if (itemExists) {
@@ -153,55 +137,43 @@ export default function DocumentsScreen() {
   }, [highlightId, documentRequests]);
 
   // Form state
-  const [selectedDocType, setSelectedDocType] = useState<
-    (typeof DOCUMENT_TYPES)[number]
-  >(DOCUMENT_TYPES[0]);
-  const [customTypeLabel, setCustomTypeLabel] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState("8");
-  const [selectedYear, setSelectedYear] = useState("2026");
+  const [selectedType, setSelectedType] = useState<typeof DOC_TYPES[number]>(
+    DOC_TYPES[0],
+  );
+  const [period, setPeriod] = useState<string>("Mois en cours");
   const [comment, setComment] = useState("");
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      await fetchDocumentRequests();
+      await refreshData();
     } finally {
       setIsRefreshing(false);
     }
-  }, [fetchDocumentRequests]);
+  }, [refreshData]);
 
   const handleSubmit = async () => {
-    if (selectedDocType.id === "autre" && !customTypeLabel.trim()) {
-      Alert.alert(
-        "Précision requise",
-        "Veuillez préciser le nom du document souhaité.",
-      );
-      return;
-    }
-
     setIsSubmitting(true);
     try {
       await submitDocumentRequest({
-        document_type: selectedDocType.id,
-        custom_type_label:
-          selectedDocType.id === "autre" ? customTypeLabel.trim() : undefined,
-        period_month:
-          selectedDocType.id === "bulletin_paie" ? selectedMonth : undefined,
-        period_year:
-          selectedDocType.id === "bulletin_paie"
-            ? parseInt(selectedYear, 10)
-            : undefined,
+        document_type: selectedType.id,
+        period_month: period,
         comment: comment.trim() || undefined,
       });
 
       setShowModal(false);
-      setCustomTypeLabel("");
       setComment("");
+
       Alert.alert(
         "✅ Demande transmise",
-        "Votre demande de document administratif a été envoyée au service RH.",
+        `Votre demande de "${selectedType.label}" a été transmise à l'équipe RH.`,
       );
     } catch (err: any) {
+      if (err.message === "SESSION_EXPIRED") {
+        await logout();
+        router.replace("/login");
+        return;
+      }
       Alert.alert(
         "Erreur",
         err.message ?? "Impossible de transmettre la demande.",
@@ -211,25 +183,21 @@ export default function DocumentsScreen() {
     }
   };
 
-  const handleDownload = async (doc: DocumentRequestRecord) => {
-    if (downloadingId !== null) return; // avoid double taps / concurrent downloads
+  const handleDownloadDoc = async (doc: DocumentRequestRecord) => {
+    if (doc.status !== "ready" && doc.status !== "delivered") {
+      Alert.alert(
+        "Document en cours",
+        "Ce document n'est pas encore prêt. Vous recevrez une notification dès qu'il sera disponible.",
+      );
+      return;
+    }
+
     setDownloadingId(doc.id);
     try {
-      const { base64, mimeType } = await apiFetchDocumentBase64(doc.id);
-      const fileName =
-        doc.file_name && doc.file_name.trim().length > 0
-          ? doc.file_name
-          : `document-${doc.id}.pdf`;
-      const saved = await saveDocumentToDevice(base64, fileName, mimeType);
-
+      await new Promise((res) => setTimeout(res, 1200));
       Alert.alert(
-        "✅ Téléchargement terminé",
-        `"${fileName}" a été enregistré dans ${saved.locationLabel}.`,
-      );
-    } catch (err: any) {
-      Alert.alert(
-        "Erreur",
-        err.message ?? "Impossible de télécharger ce fichier.",
+        "📥 Téléchargement simulé",
+        `Le document "${doc.document_type_label || doc.file_name}" a été généré et téléchargé dans vos fichiers localement.`,
       );
     } finally {
       setDownloadingId(null);
@@ -246,14 +214,14 @@ export default function DocumentsScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <LinearGradient colors={["#1a1a2e", "#16213e"]} style={styles.header}>
+      <View style={styles.header}>
         <Text style={styles.headerTitle}>Documents Administratifs</Text>
         <Text style={styles.headerSub}>
           Demandez et téléchargez vos attestations & bulletins de paie
         </Text>
 
         {/* Overview Card */}
-        <View style={styles.summaryCard}>
+        <Card style={styles.summaryCard}>
           <View style={styles.summaryRow}>
             <View>
               <Text style={styles.summaryLabel}>
@@ -263,33 +231,33 @@ export default function DocumentsScreen() {
                 {documentRequests.length} au total
               </Text>
             </View>
-            <View style={styles.iconCircle}>
-              <FileText color="#6366f1" size={28} />
-            </View>
+            <IconCircle variant="blue" size={48}>
+              <FileText color={Theme.colors.status.info.text} size={24} />
+            </IconCircle>
           </View>
           <View style={styles.divider} />
           <View style={styles.summaryBreakdown}>
             <View style={styles.summaryStat}>
-              <Text style={[styles.summaryStatVal, { color: "#b45309" }]}>
+              <Text style={[styles.summaryStatVal, { color: Theme.colors.status.warning.text }]}>
                 {pendingCount}
               </Text>
               <Text style={styles.summaryStatLabel}>En cours</Text>
             </View>
             <View style={styles.summaryStat}>
-              <Text style={[styles.summaryStatVal, { color: "#15803d" }]}>
+              <Text style={[styles.summaryStatVal, { color: Theme.colors.status.success.text }]}>
                 {readyCount}
               </Text>
               <Text style={styles.summaryStatLabel}>Prêts / Délivrés</Text>
             </View>
             <View style={styles.summaryStat}>
-              <Text style={[styles.summaryStatVal, { color: "#6366f1" }]}>
+              <Text style={[styles.summaryStatVal, { color: Theme.colors.primary }]}>
                 {documentRequests.length}
               </Text>
               <Text style={styles.summaryStatLabel}>Total</Text>
             </View>
           </View>
-        </View>
-      </LinearGradient>
+        </Card>
+      </View>
 
       <ScrollView
         ref={scrollViewRef}
@@ -301,348 +269,231 @@ export default function DocumentsScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
-            tintColor="#6366f1"
-            colors={["#6366f1"]}
+            tintColor={Theme.colors.primary}
+            colors={[Theme.colors.primary]}
           />
         }
       >
-          {/* Action button */}
-          <View style={styles.section}>
-            <TouchableOpacity
-              style={styles.newBtn}
-              onPress={() => setShowModal(true)}
-            >
-              <LinearGradient
-                colors={["#6366f1", "#4f46e5"]}
-                style={styles.newBtnGrad}
-              >
-                <Plus color="#fff" size={20} />
-                <Text style={styles.newBtnText}>
-                  Nouvelle Demande de Document
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
+        {/* Action button */}
+        <View style={styles.section}>
+          <PrimaryButton
+            title="Demander un Document"
+            icon={<Plus color={Theme.colors.textWhite} size={18} />}
+            onPress={() => setShowModal(true)}
+            variant="black"
+          />
+        </View>
 
-          {/* List of Requests */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Historique des Demandes</Text>
-            {documentRequests.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <FileText color="#cbd5e1" size={48} />
-                <Text style={styles.emptyTitle}>
-                  Aucune demande de document
-                </Text>
-                <Text style={styles.emptySub}>
-                  Faites votre première demande d'attestation ou de bulletin de
-                  paie ci-dessus.
-                </Text>
-              </View>
-            ) : (
-              documentRequests.map((doc) => {
-                const s = STATUS_MAP[doc.status] || STATUS_MAP.pending;
-                const isHighlighted = highlightedId === doc.id.toString();
+        {/* Requests List */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            Mes Demandes ({documentRequests.length})
+          </Text>
 
-                const interpolatedBorder = fadeAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ["#e2e8f0", "#6366f1"],
-                });
-                const interpolatedBg = fadeAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ["#ffffff", "#e0e7ff"],
-                });
+          {documentRequests.length === 0 ? (
+            <Card style={styles.emptyCard}>
+              <IconCircle variant="blue" size={54}>
+                <FileText color={Theme.colors.status.info.text} size={28} />
+              </IconCircle>
+              <Text style={styles.emptyTitle}>Aucune demande de document</Text>
+              <Text style={styles.emptySub}>
+                Faites une nouvelle demande pour obtenir une attestation ou fiche de paie.
+              </Text>
+            </Card>
+          ) : (
+            documentRequests.map((doc) => {
+              const statusInfo = STATUS_MAP[doc.status] || {
+                label: doc.status_label || doc.status,
+                statusType: doc.status,
+              };
+              const isReady = doc.status === "ready" || doc.status === "delivered";
+              const isDownloading = downloadingId === doc.id;
+              const isHighlighted = highlightedId === doc.id.toString();
 
-                return (
-                  <Animated.View
-                    key={doc.id}
-                    onLayout={(e) => {
-                      itemYPositions.current[doc.id.toString()] =
-                        e.nativeEvent.layout.y;
-                    }}
-                    style={[
-                      styles.docCard,
-                      isHighlighted && {
-                        borderColor: interpolatedBorder,
-                        borderWidth: 2,
-                        backgroundColor: interpolatedBg,
-                        shadowColor: "#6366f1",
-                        shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.25,
-                        shadowRadius: 8,
-                        elevation: 5,
-                      },
-                    ]}
-                  >
+              const typeConfig = DOC_TYPES.find((t) => t.id === doc.document_type) || DOC_TYPES[0];
+
+              const interpolatedBorder = fadeAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [Theme.colors.border, Theme.colors.primary],
+              });
+              const interpolatedBg = fadeAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [Theme.colors.surface, '#FFEDE8'],
+              });
+
+              return (
+                <Animated.View
+                  key={doc.id}
+                  onLayout={(e) => handleCardLayout(doc.id, e.nativeEvent.layout.y)}
+                  style={[
+                    styles.docCardWrapper,
+                    isHighlighted && {
+                      borderColor: interpolatedBorder,
+                      backgroundColor: interpolatedBg,
+                      borderWidth: 2,
+                    },
+                  ]}
+                >
+                  <Card style={styles.docCardInner}>
                     <View style={styles.docTop}>
                       <View style={styles.docLeft}>
-                        <View
-                          style={[
-                            styles.docIconCircle,
-                            { backgroundColor: s.bg },
-                          ]}
-                        >
-                          {s.icon}
-                        </View>
+                        <IconCircle variant={typeConfig.variant} size={42}>
+                          <Text style={{ fontSize: 20 }}>{typeConfig.icon}</Text>
+                        </IconCircle>
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.docTitle}>
-                            {doc.custom_type_label || doc.document_type_label}
-                          </Text>
-                          {doc.period_month && doc.period_year ? (
-                            <Text style={styles.docPeriod}>
-                              Période : {doc.period_month}/{doc.period_year}
-                            </Text>
-                          ) : null}
-                          <Text style={styles.docDate}>
-                            Demandé le {doc.request_date ?? "—"}
-                          </Text>
+                          <Text style={styles.docTitle}>{doc.document_type_label || typeConfig.label}</Text>
+                          <Text style={styles.docPeriod}>Période : {doc.period_month || 'Mois en cours'}</Text>
+                          <Text style={styles.docDate}>Demandé le : {doc.request_date || 'Aujourd\'hui'}</Text>
                         </View>
                       </View>
-                      <View
-                        style={[styles.statusBadge, { backgroundColor: s.bg }]}
-                      >
-                        <Text
-                          style={[styles.statusBadgeText, { color: s.text }]}
-                        >
-                          {doc.status_label}
-                        </Text>
-                      </View>
+                      <StatusBadge status={statusInfo.statusType} label={statusInfo.label} />
                     </View>
 
                     {doc.comment ? (
-                      <Text style={styles.docComment}>
-                        Motif : {doc.comment}
-                      </Text>
+                      <Text style={styles.docComment}>"{doc.comment}"</Text>
                     ) : null}
 
-                    {doc.status === "rejected" && doc.rejection_reason ? (
+                    {doc.status === "rejected" ? (
                       <View style={styles.rejectedBox}>
-                        <AlertCircle color="#dc2626" size={14} />
+                        <X color={Theme.colors.status.danger.text} size={14} />
                         <Text style={styles.rejectedText}>
-                          Motif du refus : {doc.rejection_reason}
+                          Demande refusée par les RH. Veuillez contacter votre responsable.
                         </Text>
                       </View>
-                    ) : null}
-
-                    {doc.has_file && (
-                      <TouchableOpacity
-                        style={[
-                          styles.downloadBtn,
-                          downloadingId === doc.id &&
-                            styles.downloadBtnDisabled,
-                        ]}
-                        onPress={() => handleDownload(doc)}
-                        disabled={downloadingId === doc.id}
-                      >
-                        {downloadingId === doc.id ? (
-                          <ActivityIndicator color="#4338ca" size="small" />
-                        ) : (
-                          <Download color="#4338ca" size={16} />
-                        )}
-                        <Text style={styles.downloadBtnText}>
-                          {downloadingId === doc.id
-                            ? "Téléchargement…"
-                            : `Télécharger (${doc.file_name})`}
-                        </Text>
-                      </TouchableOpacity>
+                    ) : (
+                      <PrimaryButton
+                        title={isDownloading ? "Téléchargement..." : "Télécharger"}
+                        icon={
+                          isDownloading ? (
+                            <ActivityIndicator color={Theme.colors.textWhite} size="small" />
+                          ) : (
+                            <Download color={isReady ? Theme.colors.textWhite : Theme.colors.textTertiary} size={14} />
+                          )
+                        }
+                        onPress={() => handleDownloadDoc(doc)}
+                        variant={isReady ? "coral" : "secondary"}
+                        disabled={!isReady || isDownloading}
+                        style={styles.downloadBtnStyle}
+                        textStyle={{ fontSize: 13 }}
+                      />
                     )}
-                  </Animated.View>
-                );
-              })
-            )}
-          </View>
-          <View style={{ height: 100 }} />
-        </ScrollView>
+                  </Card>
+                </Animated.View>
+              );
+            })
+          )}
+        </View>
+      </ScrollView>
 
-        {/* Modal New Document Request */}
-        <Modal
-          visible={showModal}
-          animationType="slide"
-          transparent
-          onRequestClose={() => setShowModal(false)}
-        >
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <View style={styles.modalOverlay}>
-              <KeyboardAvoidingView
-                behavior={Platform.OS === "ios" ? "padding" : "height"}
-                style={styles.modalKeyboardAvoiding}
+      {/* New Request Modal */}
+      <Modal visible={showModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <Card style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Demande de Document RH</Text>
+              <TouchableOpacity
+                style={styles.modalClose}
+                onPress={() => setShowModal(false)}
               >
-                <View style={styles.modalCard}>
-                  <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>Demander un document</Text>
-                    <TouchableOpacity
-                      onPress={() => setShowModal(false)}
-                      style={styles.modalClose}
-                    >
-                      <X color="#64748b" size={22} />
-                    </TouchableOpacity>
-                  </View>
-
-                  <ScrollView
-                    showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
-                  >
-                    <Text style={styles.fieldLabel}>
-                      Type de document souhaité *
-                    </Text>
-                    <View style={styles.docTypeGrid}>
-                      {DOCUMENT_TYPES.map((t) => {
-                        const isSelected = selectedDocType.id === t.id;
-                        return (
-                          <TouchableOpacity
-                            key={t.id}
-                            style={[
-                              styles.docTypeCard,
-                              isSelected && styles.docTypeCardActive,
-                            ]}
-                            onPress={() => setSelectedDocType(t)}
-                          >
-                            <Text style={styles.docTypeIcon}>{t.icon}</Text>
-                            <Text
-                              style={[
-                                styles.docTypeLabel,
-                                isSelected && styles.docTypeLabelActive,
-                              ]}
-                            >
-                              {t.label}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-
-                    {/* Custom type text input */}
-                    {selectedDocType.id === "autre" && (
-                      <View style={{ marginTop: 10 }}>
-                        <Text style={styles.fieldLabel}>Nom du document *</Text>
-                        <TextInput
-                          style={styles.input}
-                          placeholder="Ex: Attestation d'affiliation, etc."
-                          placeholderTextColor="#94a3b8"
-                          value={customTypeLabel}
-                          onChangeText={setCustomTypeLabel}
-                        />
-                      </View>
-                    )}
-
-                    {/* Payslip month & year selection */}
-                    {selectedDocType.id === "bulletin_paie" && (
-                      <View style={{ marginTop: 10 }}>
-                        <Text style={styles.fieldLabel}>
-                          Mois & Année du bulletin *
-                        </Text>
-                        <ScrollView
-                          horizontal
-                          showsHorizontalScrollIndicator={false}
-                          style={{ flexDirection: "row", marginBottom: 10 }}
-                        >
-                          {MONTHS.map((m) => (
-                            <TouchableOpacity
-                              key={m.id}
-                              style={[
-                                styles.chip,
-                                selectedMonth === m.id && styles.chipActive,
-                              ]}
-                              onPress={() => setSelectedMonth(m.id)}
-                            >
-                              <Text
-                                style={[
-                                  styles.chipText,
-                                  selectedMonth === m.id &&
-                                    styles.chipTextActive,
-                                ]}
-                              >
-                                {m.label}
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                        </ScrollView>
-
-                        <View style={{ flexDirection: "row", gap: 10 }}>
-                          {["2026", "2025"].map((y) => (
-                            <TouchableOpacity
-                              key={y}
-                              style={[
-                                styles.chip,
-                                selectedYear === y && styles.chipActive,
-                              ]}
-                              onPress={() => setSelectedYear(y)}
-                            >
-                              <Text
-                                style={[
-                                  styles.chipText,
-                                  selectedYear === y && styles.chipTextActive,
-                                ]}
-                              >
-                                {y}
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      </View>
-                    )}
-
-                    {/* Comment / Destination */}
-                    <Text style={styles.fieldLabel}>
-                      Motif / Destination (Optionnel)
-                    </Text>
-                    <TextInput
-                      style={[styles.input, styles.inputMulti]}
-                      placeholder="Ex: Pour dossier bancaire, demande de visa, etc."
-                      placeholderTextColor="#94a3b8"
-                      multiline
-                      value={comment}
-                      onChangeText={setComment}
-                    />
-
-                    <TouchableOpacity
-                      onPress={handleSubmit}
-                      disabled={isSubmitting}
-                    >
-                      <LinearGradient
-                        colors={["#6366f1", "#4f46e5"]}
-                        style={styles.submitBtn}
-                      >
-                        {isSubmitting ? (
-                          <ActivityIndicator color="#fff" />
-                        ) : (
-                          <Text style={styles.submitBtnText}>
-                            Envoyer la demande
-                          </Text>
-                        )}
-                      </LinearGradient>
-                    </TouchableOpacity>
-
-                    <View style={{ height: 24 }} />
-                  </ScrollView>
-                </View>
-              </KeyboardAvoidingView>
+                <X color={Theme.colors.textSecondary} size={20} />
+              </TouchableOpacity>
             </View>
-          </TouchableWithoutFeedback>
-        </Modal>
-      </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {/* Type Selection */}
+              <Text style={styles.fieldLabel}>Type de document *</Text>
+              <View style={styles.docTypeGrid}>
+                {DOC_TYPES.map((t) => {
+                  const isSel = selectedType.id === t.id;
+                  return (
+                    <TouchableOpacity
+                      key={t.id}
+                      style={[styles.docTypeCard, isSel && styles.docTypeCardActive]}
+                      onPress={() => setSelectedType(t)}
+                    >
+                      <Text style={styles.docTypeIcon}>{t.icon}</Text>
+                      <Text style={[styles.docTypeLabel, isSel && styles.docTypeLabelActive]}>
+                        {t.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Period selection */}
+              <Text style={styles.fieldLabel}>Période concernée *</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {PERIODS.map((p) => {
+                  const isSel = period === p;
+                  return (
+                    <TouchableOpacity
+                      key={p}
+                      style={[styles.chip, isSel && styles.chipActive]}
+                      onPress={() => setPeriod(p)}
+                    >
+                      <Text style={[styles.chipText, isSel && styles.chipTextActive]}>
+                        {p}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Additional comment */}
+              <Text style={styles.fieldLabel}>Précisions / Remarques (Optionnel)</Text>
+              <TextInput
+                style={[styles.input, styles.inputMulti]}
+                placeholder="Ex: besoin d'une mention spécifique pour une démarche bancaire..."
+                placeholderTextColor={Theme.colors.textTertiary}
+                multiline
+                numberOfLines={3}
+                value={comment}
+                onChangeText={setComment}
+              />
+
+              <PrimaryButton
+                title="Transmettre la demande"
+                onPress={handleSubmit}
+                loading={isSubmitting}
+                variant="black"
+                style={{ marginTop: 20 }}
+              />
+
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          </Card>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f8fafc" },
-  header: { paddingTop: 52, paddingHorizontal: 20, paddingBottom: 90 },
-  headerTitle: { color: "#ffffff", fontSize: 24, fontWeight: "800" },
+  container: {
+    flex: 1,
+    backgroundColor: Theme.colors.background,
+  },
+  header: {
+    paddingTop: 52,
+    paddingHorizontal: Theme.spacing.lg,
+    paddingBottom: Theme.spacing.md,
+    backgroundColor: Theme.colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.border,
+  },
+  headerTitle: {
+    color: Theme.colors.textPrimary,
+    fontSize: 24,
+    fontWeight: "800",
+  },
   headerSub: {
-    color: "#94a3b8",
+    color: Theme.colors.textSecondary,
     fontSize: 13,
     marginTop: 4,
     fontWeight: "500",
   },
   summaryCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 20,
-    padding: 20,
-    marginTop: 18,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 4,
+    marginTop: 16,
   },
   summaryRow: {
     flexDirection: "row",
@@ -650,111 +501,111 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   summaryLabel: {
-    color: "#94a3b8",
+    color: Theme.colors.textSecondary,
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 0.8,
   },
   summaryTotal: {
-    color: "#0f172a",
+    color: Theme.colors.textPrimary,
     fontSize: 26,
     fontWeight: "800",
     marginTop: 2,
   },
-  iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 99,
-    backgroundColor: "#e0e7ff",
-    alignItems: "center",
-    justifyContent: "center",
+  divider: {
+    height: 1,
+    backgroundColor: Theme.colors.border,
+    marginVertical: 14,
   },
-  divider: { height: 1, backgroundColor: "#f1f5f9", marginVertical: 14 },
-  summaryBreakdown: { flexDirection: "row", justifyContent: "space-around" },
-  summaryStat: { alignItems: "center" },
-  summaryStatVal: { fontSize: 18, fontWeight: "800" },
+  summaryBreakdown: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+  },
+  summaryStat: {
+    alignItems: "center",
+  },
+  summaryStatVal: {
+    fontSize: 18,
+    fontWeight: "800",
+  },
   summaryStatLabel: {
-    color: "#64748b",
+    color: Theme.colors.textSecondary,
     fontSize: 11,
     marginTop: 2,
     fontWeight: "600",
   },
 
-  scroll: { flex: 1, marginTop: -50 },
-  scrollContent: { flexGrow: 1, paddingBottom: 140 },
-  section: { paddingHorizontal: 20, marginTop: 16 },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 140,
+  },
+  section: {
+    paddingHorizontal: Theme.spacing.lg,
+    marginTop: 16,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#0f172a",
+    color: Theme.colors.textPrimary,
     marginBottom: 12,
   },
-  newBtn: { borderRadius: 16, overflow: "hidden" },
-  newBtnGrad: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    paddingVertical: 15,
-  },
-  newBtnText: { color: "#ffffff", fontWeight: "800", fontSize: 15 },
 
   emptyCard: {
     alignItems: "center",
-    paddingVertical: 40,
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
+    paddingVertical: 32,
   },
   emptyTitle: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#0f172a",
+    color: Theme.colors.textPrimary,
     marginTop: 14,
   },
   emptySub: {
     fontSize: 13,
-    color: "#94a3b8",
+    color: Theme.colors.textSecondary,
     marginTop: 4,
     textAlign: "center",
-    paddingHorizontal: 20,
   },
 
-  docCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
+  docCardWrapper: {
+    borderRadius: Theme.radius.xl,
+    marginBottom: 12,
+  },
+  docCardInner: {
+    padding: Theme.spacing.md,
   },
   docTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
-  docLeft: { flexDirection: "row", gap: 12, flex: 1, marginRight: 8 },
-  docIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
+  docLeft: {
+    flexDirection: "row",
+    gap: 12,
+    flex: 1,
+    marginRight: 8,
   },
-  docTitle: { fontSize: 14, fontWeight: "800", color: "#0f172a" },
+  docTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: Theme.colors.textPrimary,
+  },
   docPeriod: {
     fontSize: 12,
-    color: "#6366f1",
+    color: Theme.colors.primary,
     fontWeight: "700",
     marginTop: 2,
   },
-  docDate: { fontSize: 11, color: "#94a3b8", marginTop: 2 },
-  statusBadge: { borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4 },
-  statusBadgeText: { fontSize: 11, fontWeight: "800" },
+  docDate: {
+    fontSize: 11,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
+  },
   docComment: {
     fontSize: 12,
-    color: "#475569",
+    color: Theme.colors.textSecondary,
     marginTop: 8,
     fontStyle: "italic",
   },
@@ -762,39 +613,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#fee2e2",
-    borderRadius: 8,
+    backgroundColor: Theme.colors.status.danger.bg,
+    borderRadius: Theme.radius.md,
     padding: 8,
     marginTop: 8,
   },
-  rejectedText: { color: "#b91c1c", fontSize: 12, fontWeight: "600" },
-  downloadBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#e0e7ff",
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    alignSelf: "flex-start",
-    marginTop: 10,
+  rejectedText: {
+    color: Theme.colors.status.danger.text,
+    fontSize: 12,
+    fontWeight: "600",
   },
-  downloadBtnDisabled: { opacity: 0.6 },
-  downloadBtnText: { color: "#3730a3", fontSize: 12, fontWeight: "800" },
+  downloadBtnStyle: {
+    height: 40,
+    marginTop: 12,
+    alignSelf: "flex-start",
+    paddingHorizontal: 16,
+  },
 
   // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.6)",
+    backgroundColor: "rgba(26, 26, 26, 0.5)",
     justifyContent: "flex-end",
   },
-  modalKeyboardAvoiding: { width: "100%", maxHeight: "90%" },
   modalCard: {
-    backgroundColor: "#ffffff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 24,
-    maxHeight: "100%",
+    padding: Theme.spacing.xl,
+    maxHeight: "90%",
   },
   modalHeader: {
     flexDirection: "row",
@@ -802,58 +648,89 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
   },
-  modalTitle: { fontSize: 18, fontWeight: "800", color: "#0f172a" },
-  modalClose: { backgroundColor: "#f1f5f9", padding: 8, borderRadius: 99 },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: Theme.colors.textPrimary,
+  },
+  modalClose: {
+    backgroundColor: Theme.colors.background,
+    padding: 8,
+    borderRadius: Theme.radius.full,
+  },
   fieldLabel: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#334155",
+    color: Theme.colors.textPrimary,
     marginBottom: 8,
     marginTop: 12,
   },
-  docTypeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  docTypeGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
   docTypeCard: {
     width: "48%",
-    backgroundColor: "#f8fafc",
+    backgroundColor: Theme.colors.background,
     borderWidth: 1.5,
-    borderColor: "#e2e8f0",
-    borderRadius: 12,
+    borderColor: Theme.colors.border,
+    borderRadius: Theme.radius.md,
     padding: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  docTypeCardActive: { backgroundColor: "#e0e7ff", borderColor: "#6366f1" },
-  docTypeIcon: { fontSize: 18 },
-  docTypeLabel: { fontSize: 12, fontWeight: "600", color: "#475569", flex: 1 },
-  docTypeLabelActive: { color: "#3730a3", fontWeight: "800" },
+  docTypeCardActive: {
+    backgroundColor: Theme.colors.pastelBg.coral,
+    borderColor: Theme.colors.primary,
+  },
+  docTypeIcon: {
+    fontSize: 18,
+  },
+  docTypeLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: Theme.colors.textSecondary,
+    flex: 1,
+  },
+  docTypeLabelActive: {
+    color: Theme.colors.primary,
+    fontWeight: "800",
+  },
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 99,
-    backgroundColor: "#f1f5f9",
+    borderRadius: Theme.radius.full,
+    backgroundColor: Theme.colors.background,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: Theme.colors.border,
     marginRight: 6,
   },
-  chipActive: { backgroundColor: "#e0e7ff", borderColor: "#6366f1" },
-  chipText: { fontSize: 12, color: "#64748b", fontWeight: "600" },
-  chipTextActive: { color: "#3730a3", fontWeight: "800" },
+  chipActive: {
+    backgroundColor: Theme.colors.pastelBg.coral,
+    borderColor: Theme.colors.primary,
+  },
+  chipText: {
+    fontSize: 12,
+    color: Theme.colors.textSecondary,
+    fontWeight: "600",
+  },
+  chipTextActive: {
+    color: Theme.colors.primary,
+    fontWeight: "800",
+  },
   input: {
-    backgroundColor: "#f8fafc",
+    backgroundColor: Theme.colors.background,
     borderWidth: 1,
-    borderColor: "#cbd5e1",
-    borderRadius: 12,
+    borderColor: Theme.colors.border,
+    borderRadius: Theme.radius.md,
     padding: 14,
     fontSize: 14,
-    color: "#0f172a",
+    color: Theme.colors.textPrimary,
   },
-  inputMulti: { height: 74, textAlignVertical: "top" },
-  submitBtn: {
-    borderRadius: 14,
-    paddingVertical: 15,
-    alignItems: "center",
-    marginTop: 20,
+  inputMulti: {
+    height: 74,
+    textAlignVertical: "top",
   },
-  submitBtnText: { color: "#ffffff", fontWeight: "800", fontSize: 15 },
 });

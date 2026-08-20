@@ -14,10 +14,12 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Eye, EyeOff, Lock, Mail, ShieldCheck, KeyRound } from 'lucide-react-native';
 import { useAppStore } from '../store/useAppStore';
+import { Theme } from '../constants/theme';
+import { IconCircle } from '../components/ui/IconCircle';
+import { PrimaryButton } from '../components/ui/PrimaryButton';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -78,7 +80,7 @@ export default function LoginScreen() {
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <LinearGradient colors={['#0f172a', '#1e1b4b', '#0f172a']} style={styles.gradient}>
+      <View style={styles.container}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.flex}
@@ -90,9 +92,9 @@ export default function LoginScreen() {
           >
             {/* Logo & Header */}
             <View style={styles.logoSection}>
-              <View style={styles.logoCircle}>
-                <ShieldCheck color="#818cf8" size={38} />
-              </View>
+              <IconCircle variant="coral" size={72} style={styles.logoCircle}>
+                <ShieldCheck color={Theme.colors.primary} size={36} />
+              </IconCircle>
               <Text style={styles.appName}>Smart HR</Text>
               <Text style={styles.tagline}>Portail Collaborateur & Ressources Humaines</Text>
             </View>
@@ -104,11 +106,11 @@ export default function LoginScreen() {
 
               {/* Email */}
               <View style={styles.inputRow}>
-                <Mail color="#94a3b8" size={18} style={styles.inputIcon} />
+                <Mail color={Theme.colors.textSecondary} size={18} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="Adresse e-mail professionnelle"
-                  placeholderTextColor="#64748b"
+                  placeholderTextColor={Theme.colors.textTertiary}
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
@@ -119,11 +121,11 @@ export default function LoginScreen() {
 
               {/* Password */}
               <View style={styles.inputRow}>
-                <Lock color="#94a3b8" size={18} style={styles.inputIcon} />
+                <Lock color={Theme.colors.textSecondary} size={18} style={styles.inputIcon} />
                 <TextInput
                   style={[styles.input, styles.inputFlex]}
                   placeholder="Mot de passe"
-                  placeholderTextColor="#64748b"
+                  placeholderTextColor={Theme.colors.textTertiary}
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
@@ -131,9 +133,9 @@ export default function LoginScreen() {
                 />
                 <TouchableOpacity onPress={() => setShowPassword((v) => !v)} style={styles.eyeBtn}>
                   {showPassword ? (
-                    <EyeOff color="#94a3b8" size={18} />
+                    <EyeOff color={Theme.colors.textSecondary} size={18} />
                   ) : (
-                    <Eye color="#94a3b8" size={18} />
+                    <Eye color={Theme.colors.textSecondary} size={18} />
                   )}
                 </TouchableOpacity>
               </View>
@@ -146,25 +148,13 @@ export default function LoginScreen() {
               ) : null}
 
               {/* Login Button */}
-              <TouchableOpacity
-                style={[styles.loginBtn, isAuthLoading && styles.loginBtnDisabled]}
+              <PrimaryButton
+                title="Se connecter"
                 onPress={handleLogin}
-                disabled={isAuthLoading}
-                activeOpacity={0.85}
-              >
-                <LinearGradient
-                  colors={['#6366f1', '#4f46e5']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.loginGradient}
-                >
-                  {isAuthLoading ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.loginBtnText}>Se connecter</Text>
-                  )}
-                </LinearGradient>
-              </TouchableOpacity>
+                loading={isAuthLoading}
+                variant="black"
+                style={{ marginTop: 8 }}
+              />
 
               <Text style={styles.hint}>
                 Utilisez vos identifiants professionnels fournis par le service RH.
@@ -179,9 +169,9 @@ export default function LoginScreen() {
             <View style={styles.modalOverlay}>
               <View style={styles.modalCard}>
                 <View style={styles.modalHeader}>
-                  <View style={styles.modalIconCircle}>
-                    <KeyRound color="#6366f1" size={24} />
-                  </View>
+                  <IconCircle variant="coral" size={56} style={{ marginBottom: 12 }}>
+                    <KeyRound color={Theme.colors.primary} size={24} />
+                  </IconCircle>
                   <Text style={styles.modalTitle}>Changement de mot de passe obligatoire</Text>
                   <Text style={styles.modalSub}>
                     Bienvenue ! Il s'agit de votre première connexion. Veuillez définir votre mot de passe personnel sécurisé.
@@ -190,11 +180,11 @@ export default function LoginScreen() {
 
                 <Text style={styles.fieldLabel}>Nouveau mot de passe *</Text>
                 <View style={styles.modalInputRow}>
-                  <Lock color="#64748b" size={18} style={styles.inputIcon} />
+                  <Lock color={Theme.colors.textSecondary} size={18} style={styles.inputIcon} />
                   <TextInput
                     style={styles.modalInput}
                     placeholder="Au moins 6 caractères"
-                    placeholderTextColor="#94a3b8"
+                    placeholderTextColor={Theme.colors.textTertiary}
                     secureTextEntry
                     value={newPassword}
                     onChangeText={setNewPassword}
@@ -203,116 +193,181 @@ export default function LoginScreen() {
 
                 <Text style={styles.fieldLabel}>Confirmer le mot de passe *</Text>
                 <View style={styles.modalInputRow}>
-                  <Lock color="#64748b" size={18} style={styles.inputIcon} />
+                  <Lock color={Theme.colors.textSecondary} size={18} style={styles.inputIcon} />
                   <TextInput
                     style={styles.modalInput}
                     placeholder="Répéter le mot de passe"
-                    placeholderTextColor="#94a3b8"
+                    placeholderTextColor={Theme.colors.textTertiary}
                     secureTextEntry
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
                   />
                 </View>
 
-                <TouchableOpacity
-                  style={styles.modalSubmitBtn}
+                <PrimaryButton
+                  title="Enregistrer le mot de passe"
                   onPress={handleChangePassword}
-                  disabled={isChangingPassword}
-                >
-                  <LinearGradient colors={['#6366f1', '#4f46e5']} style={styles.modalSubmitGrad}>
-                    {isChangingPassword ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.modalSubmitText}>Enregistrer le mot de passe</Text>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
+                  loading={isChangingPassword}
+                  variant="black"
+                  style={{ marginTop: 20 }}
+                />
               </View>
             </View>
           </TouchableWithoutFeedback>
         </Modal>
-      </LinearGradient>
+      </View>
     </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
-  gradient: { flex: 1 },
-  flex: { flex: 1 },
-  scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
-  logoSection: { alignItems: 'center', marginBottom: 36 },
-  logoCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: 'rgba(99, 102, 241, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(129, 140, 248, 0.3)',
-    alignItems: 'center',
+  container: {
+    flex: 1,
+    backgroundColor: Theme.colors.background,
+  },
+  flex: {
+    flex: 1,
+  },
+  scroll: {
+    flexGrow: 1,
     justifyContent: 'center',
-    marginBottom: 16,
+    padding: Theme.spacing.xl,
   },
-  appName: { fontSize: 32, fontWeight: '800', color: '#ffffff', letterSpacing: 0.5 },
-  tagline: { fontSize: 13, color: '#94a3b8', marginTop: 6, fontWeight: '600', textAlign: 'center' },
+  logoSection: {
+    alignItems: 'center',
+    marginBottom: Theme.spacing.xxl,
+  },
+  logoCircle: {
+    marginBottom: Theme.spacing.md,
+  },
+  appName: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: Theme.colors.textPrimary,
+    letterSpacing: -0.5,
+  },
+  tagline: {
+    fontSize: 13,
+    color: Theme.colors.textSecondary,
+    marginTop: 4,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
   card: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 24,
+    backgroundColor: Theme.colors.surface,
+    borderRadius: Theme.radius.xxl,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    padding: 28,
+    borderColor: Theme.colors.border,
+    padding: Theme.spacing.xl,
+    ...Theme.shadows.card,
   },
-  cardTitle: { fontSize: 22, fontWeight: '800', color: '#ffffff', marginBottom: 6 },
-  cardSubtitle: { fontSize: 13, color: '#94a3b8', marginBottom: 24 },
+  cardTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: Theme.colors.textPrimary,
+    marginBottom: 4,
+  },
+  cardSubtitle: {
+    fontSize: 13,
+    color: Theme.colors.textSecondary,
+    marginBottom: Theme.spacing.xl,
+  },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: 14,
+    backgroundColor: Theme.colors.background,
+    borderRadius: Theme.radius.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: Theme.colors.border,
     paddingHorizontal: 14,
     marginBottom: 14,
     height: 52,
   },
-  inputIcon: { marginRight: 10 },
-  input: { flex: 1, color: '#ffffff', fontSize: 15 },
-  inputFlex: { flex: 1 },
-  eyeBtn: { padding: 4 },
+  inputIcon: {
+    marginRight: 10,
+  },
+  input: {
+    flex: 1,
+    color: Theme.colors.textPrimary,
+    fontSize: 15,
+  },
+  inputFlex: {
+    flex: 1,
+  },
+  eyeBtn: {
+    padding: 4,
+  },
   errorBox: {
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: Theme.colors.status.danger.bg,
+    borderRadius: Theme.radius.md,
+    padding: Theme.spacing.md,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.3)',
+    borderColor: Theme.colors.status.danger.border,
   },
-  errorText: { color: '#fca5a5', fontSize: 13, lineHeight: 18 },
-  loginBtn: { borderRadius: 14, overflow: 'hidden', marginTop: 6 },
-  loginBtnDisabled: { opacity: 0.6 },
-  loginGradient: { height: 52, alignItems: 'center', justifyContent: 'center' },
-  loginBtnText: { color: '#ffffff', fontWeight: '800', fontSize: 16 },
-  hint: { color: '#64748b', fontSize: 12, textAlign: 'center', marginTop: 18, lineHeight: 16 },
+  errorText: {
+    color: Theme.colors.status.danger.text,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  hint: {
+    color: Theme.colors.textSecondary,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: Theme.spacing.lg,
+    lineHeight: 16,
+  },
 
   // Modal Change Password
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.75)', justifyContent: 'center', padding: 20 },
-  modalCard: { backgroundColor: '#ffffff', borderRadius: 24, padding: 24 },
-  modalHeader: { alignItems: 'center', marginBottom: 20 },
-  modalIconCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#e0e7ff', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: '#0f172a', textAlign: 'center' },
-  modalSub: { fontSize: 13, color: '#64748b', textAlign: 'center', marginTop: 6, lineHeight: 18 },
-  fieldLabel: { fontSize: 13, fontWeight: '700', color: '#334155', marginBottom: 6, marginTop: 10 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(26, 26, 26, 0.5)',
+    justifyContent: 'center',
+    padding: Theme.spacing.xl,
+  },
+  modalCard: {
+    backgroundColor: Theme.colors.surface,
+    borderRadius: Theme.radius.xxl,
+    padding: Theme.spacing.xl,
+    ...Theme.shadows.card,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: Theme.spacing.lg,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: Theme.colors.textPrimary,
+    textAlign: 'center',
+  },
+  modalSub: {
+    fontSize: 13,
+    color: Theme.colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Theme.colors.textPrimary,
+    marginBottom: 6,
+    marginTop: 10,
+  },
   modalInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
+    backgroundColor: Theme.colors.background,
+    borderRadius: Theme.radius.md,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: Theme.colors.border,
     paddingHorizontal: 14,
     height: 48,
   },
-  modalInput: { flex: 1, color: '#0f172a', fontSize: 14 },
-  modalSubmitBtn: { borderRadius: 14, overflow: 'hidden', marginTop: 22 },
-  modalSubmitGrad: { height: 50, alignItems: 'center', justifyContent: 'center' },
-  modalSubmitText: { color: '#ffffff', fontWeight: '800', fontSize: 15 },
+  modalInput: {
+    flex: 1,
+    color: Theme.colors.textPrimary,
+    fontSize: 14,
+  },
 });

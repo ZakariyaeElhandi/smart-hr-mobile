@@ -1,22 +1,25 @@
 import { Tabs } from 'expo-router';
 import { Clock, Calendar, FileText, TrendingUp } from 'lucide-react-native';
+import { Theme } from '../../constants/theme';
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#4f46e5',
-        tabBarInactiveTintColor: '#94a3b8',
+        tabBarActiveTintColor: Theme.colors.primary,
+        tabBarInactiveTintColor: Theme.colors.textSecondary,
         tabBarStyle: {
-          backgroundColor: '#fff',
-          borderTopWidth: 0,
-          shadowColor: '#000',
+          backgroundColor: Theme.colors.surface,
+          borderTopWidth: 1,
+          borderTopColor: Theme.colors.border,
+          shadowColor: '#000000',
           shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.06,
-          shadowRadius: 16,
-          elevation: 16,
-          height: 70,
-          paddingBottom: 10,
+          shadowOpacity: 0.04,
+          shadowRadius: 12,
+          elevation: 8,
+          height: 72,
+          paddingBottom: 12,
+          paddingTop: 8,
         },
         tabBarLabelStyle: {
           fontSize: 11,
@@ -28,28 +31,28 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Ma Présence',
-          tabBarIcon: ({ color, size }) => <Clock color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <Clock color={color} size={size || 22} />,
         }}
       />
       <Tabs.Screen
         name="leaves"
         options={{
           title: 'Congés',
-          tabBarIcon: ({ color, size }) => <Calendar color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <Calendar color={color} size={size || 22} />,
         }}
       />
       <Tabs.Screen
         name="documents"
         options={{
           title: 'Documents',
-          tabBarIcon: ({ color, size }) => <FileText color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <FileText color={color} size={size || 22} />,
         }}
       />
       <Tabs.Screen
         name="performance"
         options={{
           title: 'Mon Bilan',
-          tabBarIcon: ({ color, size }) => <TrendingUp color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <TrendingUp color={color} size={size || 22} />,
         }}
       />
     </Tabs>

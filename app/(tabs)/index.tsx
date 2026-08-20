@@ -8,7 +8,6 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   ChevronLeft,
   ChevronRight,
@@ -27,6 +26,11 @@ import { useAppStore } from '../../store/useAppStore';
 import DayDetailModal, { DayDetailData } from '../../components/DayDetailModal';
 import AnomalyModal from '../../components/AnomalyModal';
 import NotificationsModal from '../../components/NotificationsModal';
+import { Theme } from '../../constants/theme';
+import { Card } from '../../components/ui/Card';
+import { StatCard } from '../../components/ui/StatCard';
+import { PrimaryButton } from '../../components/ui/PrimaryButton';
+import { IconCircle } from '../../components/ui/IconCircle';
 
 const MONTHS_FR = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -34,6 +38,11 @@ const MONTHS_FR = [
 ];
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+
+function formatHeaderDate(date: Date): string {
+  const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
+  return date.toLocaleDateString('en-US', options);
+}
 
 export default function MaPresenceScreen() {
   const {
@@ -164,31 +173,31 @@ export default function MaPresenceScreen() {
 
       let status: 'present' | 'late' | 'absent' | 'leave' | 'weekend' = 'weekend';
       let statusLabel = 'Weekend / Non travaillé';
-      let color = '#94a3b8'; // gray
-      let bgColor = '#f8fafc';
+      let color = Theme.colors.textSecondary;
+      let bgColor = Theme.colors.background;
 
       if (isLeave) {
         status = 'leave';
         statusLabel = 'Congé / Jour férié';
-        color = '#3b82f6';
-        bgColor = '#dbeafe';
+        color = Theme.colors.status.info.text;
+        bgColor = Theme.colors.status.info.bg;
       } else if (attRecord) {
         if (attRecord.is_late) {
           status = 'late';
           statusLabel = 'Présent (Retard)';
-          color = '#f59e0b';
-          bgColor = '#fef3c7';
+          color = Theme.colors.status.warning.text;
+          bgColor = Theme.colors.status.warning.bg;
         } else {
           status = 'present';
           statusLabel = 'Présent';
-          color = '#10b981';
-          bgColor = '#dcfce7';
+          color = Theme.colors.status.success.text;
+          bgColor = Theme.colors.status.success.bg;
         }
       } else if (!isWeekend && isPast) {
         status = 'absent';
         statusLabel = 'Absent / Non pointé';
-        color = '#ef4444';
-        bgColor = '#fee2e2';
+        color = Theme.colors.status.danger.text;
+        bgColor = Theme.colors.status.danger.bg;
       }
 
       grid.push({
@@ -230,6 +239,7 @@ export default function MaPresenceScreen() {
 
   const handleOpenAnomalyForDate = (data: DayDetailData) => {
     setAnomalyInitialDate(data.date);
+    setAnomalyTab('form');
     setShowAnomalyModal(true);
   };
 
@@ -247,18 +257,20 @@ export default function MaPresenceScreen() {
   return (
     <View style={styles.container}>
       {/* Top Header */}
-      <LinearGradient colors={['#1a1a2e', '#16213e']} style={styles.header}>
+      <View style={styles.header}>
         <View style={styles.headerTop}>
           <View>
-            <Text style={styles.appName}>Smart HR AI ✦ Présence</Text>
-            <Text style={styles.userName}>{user.name || 'Employé'} 👋</Text>
+            <View style={styles.datePill}>
+              <Text style={styles.datePillText}>{formatHeaderDate(now)}</Text>
+            </View>
+            <Text style={styles.welcomeText}>Bonjour, {user.name || 'Collaborateur'} 👋</Text>
           </View>
           <View style={styles.headerActions}>
             <TouchableOpacity
               style={styles.actionBtn}
               onPress={() => setShowNotifs(true)}
             >
-              <Bell color="#e2e8f0" size={20} />
+              <Bell color={Theme.colors.textPrimary} size={20} />
               {unreadCount > 0 && (
                 <View style={styles.notifBadge}>
                   <Text style={styles.notifBadgeText}>{unreadCount}</Text>
@@ -266,73 +278,95 @@ export default function MaPresenceScreen() {
               )}
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionBtn} onPress={handleLogout}>
-              <LogOut color="#e2e8f0" size={20} />
+              <LogOut color={Theme.colors.textSecondary} size={20} />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Month Selector Bar */}
-        <View style={styles.monthSelectorBar}>
-          <TouchableOpacity style={styles.monthArrow} onPress={handlePrevMonth}>
-            <ChevronLeft color="#f1f5f9" size={20} />
-          </TouchableOpacity>
-          <View style={styles.monthTitleWrapper}>
-            <CalendarIcon color="#818cf8" size={16} />
-            <Text style={styles.monthTitle}>
-              {MONTHS_FR[selectedMonth - 1]} {selectedYear}
-            </Text>
-          </View>
-          <TouchableOpacity style={styles.monthArrow} onPress={handleNextMonth}>
-            <ChevronRight color="#f1f5f9" size={20} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Monthly Summary Stats Row */}
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={[styles.statValue, { color: '#4ade80' }]}>{stats.present_days}</Text>
-            <Text style={styles.statLabel}>Présent</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={[styles.statValue, { color: '#fbbf24' }]}>{stats.late_days}</Text>
-            <Text style={styles.statLabel}>Retards</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={[styles.statValue, { color: '#f87171' }]}>{stats.absent_days}</Text>
-            <Text style={styles.statLabel}>Absences</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={[styles.statValue, { color: '#60a5fa' }]}>{hoursFormatted}</Text>
-            <Text style={styles.statLabel}>Total Heures</Text>
-          </View>
-        </View>
-      </LinearGradient>
+        {/* Quick Check-in Button (Premium Pill CTA) */}
+        <PrimaryButton
+          title="Pointage de Présence"
+          icon={<Clock color={Theme.colors.textWhite} size={20} />}
+          onPress={() => {
+            setAnomalyInitialDate(now.toISOString().split('T')[0]);
+            setAnomalyTab('form');
+            setShowAnomalyModal(true);
+          }}
+          variant="black"
+          style={styles.checkInBtn}
+        />
+      </View>
 
       <ScrollView
         style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
-            tintColor="#6366f1"
-            colors={['#6366f1']}
+            tintColor={Theme.colors.primary}
+            colors={[Theme.colors.primary]}
           />
         }
       >
-        {/* Read-Only Notice Bar */}
-        <View style={styles.readOnlyNotice}>
-          <Info color="#4338ca" size={16} />
-          <Text style={styles.readOnlyNoticeText}>
-            Les données ci-dessous correspondent au pointage officiel enregistré (Lecture seule).
-          </Text>
+        {/* Month Selector Bar */}
+        <View style={styles.monthSelectorBar}>
+          <TouchableOpacity style={styles.monthArrow} onPress={handlePrevMonth}>
+            <ChevronLeft color={Theme.colors.textPrimary} size={20} />
+          </TouchableOpacity>
+          <View style={styles.monthTitleWrapper}>
+            <CalendarIcon color={Theme.colors.primary} size={18} />
+            <Text style={styles.monthTitle}>
+              {MONTHS_FR[selectedMonth - 1]} {selectedYear}
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.monthArrow} onPress={handleNextMonth}>
+            <ChevronRight color={Theme.colors.textPrimary} size={20} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Monthly Summary Stats Grid (2x2) */}
+        <View style={styles.statsGrid}>
+          <View style={styles.statsRow}>
+            <StatCard
+              title="Présences"
+              value={stats.present_days}
+              icon={<CheckCircle2 color={Theme.colors.status.success.text} size={20} />}
+              variant="green"
+              valueColor={Theme.colors.status.success.text}
+            />
+            <StatCard
+              title="Retards"
+              value={stats.late_days}
+              icon={<Clock color={Theme.colors.status.warning.text} size={20} />}
+              variant="yellow"
+              valueColor={Theme.colors.status.warning.text}
+            />
+          </View>
+          <View style={styles.statsRow}>
+            <StatCard
+              title="Absences"
+              value={stats.absent_days}
+              icon={<XCircle color={Theme.colors.status.danger.text} size={20} />}
+              variant="coral"
+              valueColor={Theme.colors.status.danger.text}
+            />
+            <StatCard
+              title="Total Heures"
+              value={hoursFormatted}
+              icon={<Clock color={Theme.colors.status.info.text} size={20} />}
+              variant="purple"
+              valueColor={Theme.colors.status.info.text}
+            />
+          </View>
         </View>
 
         {/* Calendar Section */}
-        <View style={styles.calendarContainer}>
+        <Card style={styles.calendarCard}>
           <View style={styles.calendarHeaderRow}>
             <Text style={styles.calendarSectionTitle}>Calendrier Mensuel</Text>
-            {isMonthlyLoading && <ActivityIndicator color="#6366f1" size="small" />}
+            {isMonthlyLoading && <ActivityIndicator color={Theme.colors.primary} size="small" />}
           </View>
 
           {/* Weekday Labels */}
@@ -381,55 +415,52 @@ export default function MaPresenceScreen() {
             <Text style={styles.legendTitle}>Légende des couleurs :</Text>
             <View style={styles.legendGrid}>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#10b981' }]} />
+                <View style={[styles.legendDot, { backgroundColor: Theme.colors.status.success.text }]} />
                 <Text style={styles.legendLabel}>Présent</Text>
               </View>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#f59e0b' }]} />
+                <View style={[styles.legendDot, { backgroundColor: Theme.colors.status.warning.text }]} />
                 <Text style={styles.legendLabel}>Retard</Text>
               </View>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#ef4444' }]} />
+                <View style={[styles.legendDot, { backgroundColor: Theme.colors.status.danger.text }]} />
                 <Text style={styles.legendLabel}>Absent</Text>
               </View>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#3b82f6' }]} />
+                <View style={[styles.legendDot, { backgroundColor: Theme.colors.status.info.text }]} />
                 <Text style={styles.legendLabel}>Congé / Férié</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#94a3b8' }]} />
-                <Text style={styles.legendLabel}>Weekend</Text>
               </View>
             </View>
           </View>
-        </View>
+        </Card>
 
-        {/* Anomaly & Claims Action Bar */}
-        <View style={styles.claimsBanner}>
-          <View style={styles.claimsBannerLeft}>
-            <AlertTriangle color="#dc2626" size={24} />
-            <View>
-              <Text style={styles.claimsBannerTitle}>Erreur sur votre présence ?</Text>
-              <Text style={styles.claimsBannerSub}>
+        {/* Claims & Anomalies Banner */}
+        <Card style={styles.claimsBanner}>
+          <View style={styles.claimsHeader}>
+            <IconCircle variant="coral" size={44}>
+              <AlertTriangle color={Theme.colors.primary} size={22} />
+            </IconCircle>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.claimsTitle}>Signalements & Anomalies</Text>
+              <Text style={styles.claimsSub}>
                 {pendingAnomaliesCount > 0
-                  ? `${pendingAnomaliesCount} réclamation(s) en attente du RH`
-                  : "Signalez toute omission ou erreur de pointage."}
+                  ? `${pendingAnomaliesCount} réclamation(s) en cours d'examen RH.`
+                  : 'Déclarez un oubli de pointage ou une anomalie.'}
               </Text>
             </View>
           </View>
-          <TouchableOpacity
-            style={styles.claimsBannerBtn}
+
+          <PrimaryButton
+            title="Suivi des Réclamations"
+            icon={<FileText color={Theme.colors.textWhite} size={16} />}
             onPress={() => {
               setAnomalyInitialDate(undefined);
+              setAnomalyTab('list');
               setShowAnomalyModal(true);
             }}
-          >
-            <FileText color="#ffffff" size={16} />
-            <Text style={styles.claimsBannerBtnText}>Suivi Réclamations</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={{ height: 90 }} />
+            variant="black"
+          />
+        </Card>
       </ScrollView>
 
       {/* Day Detail Modal */}
@@ -466,76 +497,124 @@ export default function MaPresenceScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  header: { paddingTop: 52, paddingBottom: 20, paddingHorizontal: 20 },
-  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  appName: { color: '#818cf8', fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
-  userName: { color: '#f1f5f9', fontSize: 24, fontWeight: '800', marginTop: 2 },
-  headerActions: { flexDirection: 'row', gap: 10 },
-  actionBtn: { backgroundColor: 'rgba(255,255,255,0.08)', padding: 10, borderRadius: 12, position: 'relative' },
+  container: {
+    flex: 1,
+    backgroundColor: Theme.colors.background,
+  },
+  header: {
+    paddingTop: 52,
+    paddingHorizontal: Theme.spacing.lg,
+    paddingBottom: Theme.spacing.md,
+    backgroundColor: Theme.colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.border,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Theme.spacing.md,
+  },
+  datePill: {
+    backgroundColor: Theme.colors.background,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: Theme.radius.full,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+  },
+  datePillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Theme.colors.textSecondary,
+  },
+  welcomeText: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: Theme.colors.textPrimary,
+    marginTop: 6,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  actionBtn: {
+    backgroundColor: Theme.colors.background,
+    padding: 10,
+    borderRadius: Theme.radius.md,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    position: 'relative',
+  },
   notifBadge: {
-    minWidth: 16, height: 16,
-    backgroundColor: '#ef4444',
-    borderRadius: 99,
-    position: 'absolute', top: 5, right: 5,
-    alignItems: 'center', justifyContent: 'center',
+    minWidth: 16,
+    height: 16,
+    backgroundColor: Theme.colors.primary,
+    borderRadius: Theme.radius.full,
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 3,
   },
-  notifBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  notifBadgeText: {
+    color: Theme.colors.textWhite,
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  checkInBtn: {
+    marginTop: 4,
+  },
+
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: Theme.spacing.lg,
+    paddingTop: Theme.spacing.lg,
+    paddingBottom: 140,
+  },
 
   monthSelectorBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 16,
-  },
-  monthArrow: { padding: 6 },
-  monthTitleWrapper: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  monthTitle: { color: '#ffffff', fontSize: 16, fontWeight: '800' },
-
-  statsRow: { flexDirection: 'row', gap: 8 },
-  statCard: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderRadius: 14,
+    backgroundColor: Theme.colors.surface,
+    borderRadius: Theme.radius.xl,
+    paddingHorizontal: 14,
     paddingVertical: 10,
-    paddingHorizontal: 6,
-    alignItems: 'center',
+    marginBottom: Theme.spacing.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: Theme.colors.border,
+    ...Theme.shadows.soft,
   },
-  statValue: { fontSize: 17, fontWeight: '800' },
-  statLabel: { color: '#94a3b8', fontSize: 10, marginTop: 2, textAlign: 'center', fontWeight: '600' },
-
-  scroll: { flex: 1 },
-
-  readOnlyNotice: {
+  monthArrow: {
+    padding: 6,
+  },
+  monthTitleWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#e0e7ff',
-    marginHorizontal: 20,
-    marginTop: 16,
-    padding: 12,
-    borderRadius: 14,
   },
-  readOnlyNoticeText: { fontSize: 12, color: '#3730a3', fontWeight: '600', flex: 1 },
+  monthTitle: {
+    color: Theme.colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '800',
+  },
 
-  calendarContainer: {
-    backgroundColor: '#ffffff',
-    marginHorizontal: 20,
-    marginTop: 16,
-    borderRadius: 20,
-    padding: 18,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
+  statsGrid: {
+    gap: Theme.spacing.md,
+    marginBottom: Theme.spacing.lg,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: Theme.spacing.md,
+  },
+
+  calendarCard: {
+    marginBottom: Theme.spacing.lg,
   },
   calendarHeaderRow: {
     flexDirection: 'row',
@@ -543,66 +622,105 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 14,
   },
-  calendarSectionTitle: { fontSize: 16, fontWeight: '800', color: '#0f172a' },
+  calendarSectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Theme.colors.textPrimary,
+  },
 
-  weekdayRow: { flexDirection: 'row', marginBottom: 8 },
-  weekdayText: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '700', color: '#94a3b8' },
+  weekdayRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  weekdayText: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '700',
+    color: Theme.colors.textTertiary,
+  },
 
-  daysGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  emptyDayCell: { width: '14.28%', height: 48 },
+  daysGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  emptyDayCell: {
+    width: '14.28%',
+    height: 48,
+  },
   dayCell: {
     width: '14.28%',
     height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: Theme.radius.md,
     marginBottom: 6,
   },
   todayBorder: {
     borderWidth: 2,
-    borderColor: '#6366f1',
+    borderColor: Theme.colors.primary,
   },
-  dayNumberText: { fontSize: 14, fontWeight: '800' },
-  dotIndicator: { width: 5, height: 5, borderRadius: 99, marginTop: 2 },
+  dayNumberText: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  dotIndicator: {
+    width: 5,
+    height: 5,
+    borderRadius: Theme.radius.full,
+    marginTop: 2,
+  },
 
   legendContainer: {
     marginTop: 14,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
+    borderTopColor: Theme.colors.border,
   },
-  legendTitle: { fontSize: 12, fontWeight: '700', color: '#64748b', marginBottom: 8 },
-  legendGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendDot: { width: 8, height: 8, borderRadius: 99 },
-  legendLabel: { fontSize: 11, color: '#475569', fontWeight: '600' },
-
-  claimsBanner: {
-    backgroundColor: '#ffffff',
-    marginHorizontal: 20,
-    marginTop: 16,
-    borderRadius: 20,
-    padding: 16,
-    gap: 14,
-    borderWidth: 1,
-    borderColor: '#fee2e2',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
+  legendTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Theme.colors.textSecondary,
+    marginBottom: 8,
   },
-  claimsBannerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  claimsBannerTitle: { fontSize: 15, fontWeight: '800', color: '#0f172a' },
-  claimsBannerSub: { fontSize: 12, color: '#64748b', marginTop: 2 },
-  claimsBannerBtn: {
+  legendGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#dc2626',
-    paddingVertical: 12,
-    borderRadius: 14,
+    gap: 6,
   },
-  claimsBannerBtnText: { color: '#ffffff', fontWeight: '800', fontSize: 14 },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: Theme.radius.full,
+  },
+  legendLabel: {
+    fontSize: 11,
+    color: Theme.colors.textSecondary,
+    fontWeight: '600',
+  },
+
+  claimsBanner: {
+    gap: 14,
+  },
+  claimsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  claimsTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Theme.colors.textPrimary,
+  },
+  claimsSub: {
+    fontSize: 12,
+    color: Theme.colors.textSecondary,
+    marginTop: 2,
+    lineHeight: 16,
+  },
 });

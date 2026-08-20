@@ -1,85 +1,79 @@
 export const Theme = {
   colors: {
-    primary: {
-      50: '#eef2ff',
-      100: '#e0e7ff',
-      200: '#c7d2fe',
-      500: '#6366f1',
-      600: '#4f46e5',
-      700: '#4338ca',
-      800: '#3730a3',
-      900: '#312e81',
-      darkNav: '#0f172a',
-      darkHeader: '#171923',
-    },
-    neutral: {
-      bg: '#f8fafc',
-      card: '#ffffff',
-      cardAlt: '#f1f5f9',
-      border: '#e2e8f0',
-      borderDark: '#cbd5e1',
-      textTitle: '#0f172a',
-      textBody: '#334155',
-      textMuted: '#64748b',
-      textSubtle: '#94a3b8',
-      white: '#ffffff',
-    },
+    background: '#FAFAFA',
+    surface: '#FFFFFF',
+    primary: '#FF6B4A',         // Accent Corail Principal (Kit UI)
+    primaryPressed: '#E85A3A',
+    ctaBlack: '#1A1A1A',        // Noir profond pour boutons d'action principaux
+
+    textPrimary: '#1A1A1A',
+    textSecondary: '#8E8E93',
+    textTertiary: '#C7C7CC',
+    textWhite: '#FFFFFF',
+
+    border: '#F0F0F0',
+    borderDark: '#E5E5EA',
+
+    // Statuts métier
     status: {
-      present: { bg: '#dcfce7', text: '#15803d', border: '#bbf7d0', main: '#10b981' },
-      late: { bg: '#fef3c7', text: '#b45309', border: '#fde68a', main: '#f59e0b' },
-      absent: { bg: '#fee2e2', text: '#b91c1c', border: '#fecaca', main: '#ef4444' },
-      leave: { bg: '#dbeafe', text: '#1d4ed8', border: '#bfdbfe', main: '#3b82f6' },
-      weekend: { bg: '#f1f5f9', text: '#64748b', border: '#e2e8f0', main: '#94a3b8' },
-      pending: { bg: '#fef9c3', text: '#854d0e', border: '#fef08a', main: '#d97706' },
-      resolved: { bg: '#dcfce7', text: '#15803d', border: '#bbf7d0', main: '#16a34a' },
-      rejected: { bg: '#fee2e2', text: '#991b1b', border: '#fecaca', main: '#dc2626' },
+      success: { text: '#34C759', bg: '#E8F9EC', border: '#C7F4D2' }, // Validé, Prêt, Approuvé
+      warning: { text: '#FF9500', bg: '#FFF4E5', border: '#FFE2B8' }, // En attente, En cours
+      danger: { text: '#FF3B30', bg: '#FFEBEA', border: '#FFC5C2' },  // Refusé, Rejeté, Absent
+      info: { text: '#5E5CE6', bg: '#EDECFC', border: '#D2D0FA' },    // Demandes, Notifications, IA
+    },
+
+    // Cercles pastel pour icônes
+    pastelBg: {
+      purple: '#EDECFC',
+      blue: '#E5F1FF',
+      coral: '#FFEDE8',
+      green: '#E8F9EC',
+      yellow: '#FFF4E5',
     },
   },
+
   typography: {
-    h1: { fontSize: 26, fontWeight: '800' as const, lineHeight: 32 },
-    h2: { fontSize: 20, fontWeight: '800' as const, lineHeight: 26 },
-    h3: { fontSize: 16, fontWeight: '700' as const, lineHeight: 22 },
-    bodyBold: { fontSize: 14, fontWeight: '700' as const, lineHeight: 20 },
-    body: { fontSize: 14, fontWeight: '500' as const, lineHeight: 20 },
-    subText: { fontSize: 12, fontWeight: '500' as const, lineHeight: 16 },
-    caption: { fontSize: 11, fontWeight: '600' as const, lineHeight: 14 },
+    screenTitle: { fontSize: 24, fontWeight: '800' as const, color: '#1A1A1A', lineHeight: 30 },
+    sectionTitle: { fontSize: 18, fontWeight: '800' as const, color: '#1A1A1A', lineHeight: 24 },
+    cardTitle: { fontSize: 15, fontWeight: '700' as const, color: '#1A1A1A', lineHeight: 20 },
+    statValue: { fontSize: 28, fontWeight: '800' as const, color: '#1A1A1A', lineHeight: 34 },
+    body: { fontSize: 14, fontWeight: '500' as const, color: '#1A1A1A', lineHeight: 20 },
+    subText: { fontSize: 13, fontWeight: '500' as const, color: '#8E8E93', lineHeight: 18 },
+    caption: { fontSize: 11, fontWeight: '600' as const, color: '#8E8E93', lineHeight: 15 },
   },
+
   spacing: {
     xs: 4,
     sm: 8,
     md: 12,
     lg: 16,
-    xl: 24,
-    xxl: 32,
+    xl: 20,
+    xxl: 24,
   },
+
   radius: {
-    sm: 8,
-    md: 12,
+    sm: 10,
+    md: 14,
     lg: 16,
     xl: 20,
+    xxl: 24,
     full: 9999,
   },
+
   shadows: {
-    sm: {
-      shadowColor: '#0f172a',
-      shadowOffset: { width: 0, height: 1 },
+    soft: {
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.04,
-      shadowRadius: 4,
+      shadowRadius: 10,
       elevation: 2,
     },
-    md: {
-      shadowColor: '#0f172a',
+    card: {
+      shadowColor: '#000000',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.06,
-      shadowRadius: 12,
-      elevation: 4,
-    },
-    lg: {
-      shadowColor: '#0f172a',
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.08,
-      shadowRadius: 20,
-      elevation: 6,
+      shadowRadius: 16,
+      elevation: 3,
     },
   },
 };

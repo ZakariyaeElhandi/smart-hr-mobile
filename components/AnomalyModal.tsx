@@ -17,6 +17,11 @@ import {
 import { X, AlertTriangle, Paperclip, Send, Clock, CheckCircle2, XCircle } from 'lucide-react-native';
 import { useAppStore } from '../store/useAppStore';
 import { AnomalyRecord } from '../utils/api';
+import { Theme } from '../constants/theme';
+import { Card } from './ui/Card';
+import { StatusBadge } from './ui/StatusBadge';
+import { PrimaryButton } from './ui/PrimaryButton';
+import { IconCircle } from './ui/IconCircle';
 
 interface Props {
   visible: boolean;
@@ -92,15 +97,17 @@ export default function AnomalyModal({ visible, onClose, initialDate, initialTab
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.keyboardAvoiding}
           >
-            <View style={styles.card}>
+            <Card style={styles.card}>
               {/* Header */}
               <View style={styles.header}>
                 <View style={styles.titleRow}>
-                  <AlertTriangle color="#dc2626" size={22} />
+                  <IconCircle variant="coral" size={38}>
+                    <AlertTriangle color={Theme.colors.primary} size={20} />
+                  </IconCircle>
                   <Text style={styles.title}>Signalement & Réclamations</Text>
                 </View>
                 <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-                  <X color="#64748b" size={20} />
+                  <X color={Theme.colors.textSecondary} size={20} />
                 </TouchableOpacity>
               </View>
 
@@ -141,6 +148,7 @@ export default function AnomalyModal({ visible, onClose, initialDate, initialTab
                       value={date}
                       onChangeText={setDate}
                       placeholder="AAAA-MM-JJ"
+                      placeholderTextColor={Theme.colors.textTertiary}
                     />
 
                     {/* Comment / Reason */}
@@ -150,6 +158,7 @@ export default function AnomalyModal({ visible, onClose, initialDate, initialTab
                       value={comment}
                       onChangeText={setComment}
                       placeholder="Ex: J'étais présent sur le site mais la pointeuse physique était hors service..."
+                      placeholderTextColor={Theme.colors.textTertiary}
                       multiline
                       numberOfLines={4}
                       textAlignVertical="top"
@@ -158,33 +167,29 @@ export default function AnomalyModal({ visible, onClose, initialDate, initialTab
                     {/* Attachment */}
                     <Text style={styles.label}>Photo / Justificatif (optionnel)</Text>
                     <TouchableOpacity style={styles.attachmentBtn} onPress={handleSimulateAttachment}>
-                      <Paperclip color="#6366f1" size={18} />
+                      <Paperclip color={Theme.colors.primary} size={18} />
                       <Text style={styles.attachmentBtnText}>
                         {attachmentName ? `Fichier : ${attachmentName}` : 'Ajouter un justificatif ou photo'}
                       </Text>
                     </TouchableOpacity>
 
                     {/* Submit button */}
-                    <TouchableOpacity
-                      style={[styles.submitBtn, isSubmitting && styles.submitBtnDisabled]}
+                    <PrimaryButton
+                      title="Transmettre au RH"
+                      icon={<Send color={Theme.colors.textWhite} size={18} />}
                       onPress={handleSubmit}
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? (
-                        <ActivityIndicator color="#fff" size="small" />
-                      ) : (
-                        <>
-                          <Send color="#fff" size={18} />
-                          <Text style={styles.submitBtnText}>Transmettre au RH</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
+                      loading={isSubmitting}
+                      variant="black"
+                      style={{ marginTop: 12 }}
+                    />
                   </View>
                 ) : (
                   <View style={styles.listContainer}>
                     {myAnomalies.length === 0 ? (
                       <View style={styles.emptyState}>
-                        <Clock color="#94a3b8" size={36} />
+                        <IconCircle variant="yellow" size={48}>
+                          <Clock color={Theme.colors.status.warning.text} size={24} />
+                        </IconCircle>
                         <Text style={styles.emptyText}>Aucune réclamation enregistrée.</Text>
                       </View>
                     ) : (
@@ -200,7 +205,7 @@ export default function AnomalyModal({ visible, onClose, initialDate, initialTab
                 )}
                 <View style={{ height: 20 }} />
               </ScrollView>
-            </View>
+            </Card>
           </KeyboardAvoidingView>
         </View>
       </TouchableWithoutFeedback>
@@ -212,32 +217,22 @@ function ClaimCard({ item, isHighlighted }: { item: AnomalyRecord; isHighlighted
   const isResolved = item.status === 'resolved' || item.resolved;
   const isRejected = item.status === 'rejected';
 
-  const badgeBg = isResolved ? '#dcfce7' : isRejected ? '#fee2e2' : '#fef9c3';
-  const badgeColor = isResolved ? '#15803d' : isRejected ? '#b91c1c' : '#92400e';
   const statusLabel = isResolved ? 'Traité / Validé' : isRejected ? 'Rejeté' : 'En attente RH';
+  const statusType = isResolved ? 'resolved' : isRejected ? 'rejected' : 'pending';
 
   return (
-    <View
+    <Card
       style={[
         styles.claimCard,
         isHighlighted && {
-          borderColor: '#6366f1',
+          borderColor: Theme.colors.primary,
           borderWidth: 2,
-          backgroundColor: '#e0e7ff',
+          backgroundColor: Theme.colors.pastelBg.coral,
         },
       ]}
     >
       <View style={styles.claimHeader}>
-        <View style={[styles.badge, { backgroundColor: badgeBg }]}>
-          {isResolved ? (
-            <CheckCircle2 color="#16a34a" size={14} />
-          ) : isRejected ? (
-            <XCircle color="#dc2626" size={14} />
-          ) : (
-            <Clock color="#d97706" size={14} />
-          )}
-          <Text style={[styles.badgeText, { color: badgeColor }]}>{statusLabel}</Text>
-        </View>
+        <StatusBadge status={statusType} label={statusLabel} />
         <Text style={styles.claimDate}>Date : {item.date_concerned || '—'}</Text>
       </View>
 
@@ -249,14 +244,14 @@ function ClaimCard({ item, isHighlighted }: { item: AnomalyRecord; isHighlighted
           <Text style={styles.rhText}>{item.rh_comment}</Text>
         </View>
       ) : null}
-    </View>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    backgroundColor: 'rgba(26, 26, 26, 0.5)',
     justifyContent: 'flex-end',
   },
   keyboardAvoiding: {
@@ -264,61 +259,58 @@ const styles = StyleSheet.create({
     maxHeight: '90%',
   },
   card: {
-    backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 24,
+    padding: Theme.spacing.xl,
     maxHeight: '100%',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: Theme.spacing.md,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   title: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#0f172a',
+    color: Theme.colors.textPrimary,
   },
   closeBtn: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: Theme.colors.background,
     padding: 8,
-    borderRadius: 99,
+    borderRadius: Theme.radius.full,
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
+    backgroundColor: Theme.colors.background,
+    borderRadius: Theme.radius.md,
     padding: 4,
-    marginBottom: 16,
+    marginBottom: Theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
   },
   tabBtn: {
     flex: 1,
     paddingVertical: 10,
     alignItems: 'center',
-    borderRadius: 10,
+    borderRadius: Theme.radius.sm,
   },
   tabBtnActive: {
-    backgroundColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: Theme.colors.surface,
+    ...Theme.shadows.soft,
   },
   tabText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#64748b',
+    color: Theme.colors.textSecondary,
   },
   tabTextActive: {
-    color: '#6366f1',
+    color: Theme.colors.primary,
     fontWeight: '800',
   },
   body: {
@@ -330,63 +322,45 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#334155',
+    color: Theme.colors.textPrimary,
     marginTop: 4,
   },
   inputDate: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: Theme.colors.background,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 12,
+    borderColor: Theme.colors.border,
+    borderRadius: Theme.radius.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    color: '#0f172a',
+    color: Theme.colors.textPrimary,
   },
   inputMultiline: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: Theme.colors.background,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 12,
+    borderColor: Theme.colors.border,
+    borderRadius: Theme.radius.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    color: '#0f172a',
+    color: Theme.colors.textPrimary,
     minHeight: 100,
   },
   attachmentBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#eeeffe',
-    borderWidth: 1,
-    borderColor: '#c7d2fe',
+    backgroundColor: Theme.colors.pastelBg.coral,
+    borderWidth: 1.5,
+    borderColor: Theme.colors.primary,
     borderStyle: 'dashed',
-    borderRadius: 12,
+    borderRadius: Theme.radius.md,
     padding: 14,
   },
   attachmentBtnText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#4338ca',
-  },
-  submitBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#6366f1',
-    paddingVertical: 14,
-    borderRadius: 14,
-    marginTop: 12,
-  },
-  submitBtnDisabled: {
-    opacity: 0.6,
-  },
-  submitBtnText: {
-    color: '#ffffff',
-    fontWeight: '800',
-    fontSize: 15,
+    color: Theme.colors.primary,
   },
   listContainer: {
     gap: 12,
@@ -397,17 +371,13 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   emptyText: {
-    color: '#94a3b8',
+    color: Theme.colors.textSecondary,
     fontSize: 14,
     fontWeight: '600',
   },
   claimCard: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
     marginBottom: 10,
+    padding: Theme.spacing.md,
   },
   claimHeader: {
     flexDirection: 'row',
@@ -415,44 +385,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 99,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
   claimDate: {
     fontSize: 12,
-    color: '#64748b',
+    color: Theme.colors.textSecondary,
     fontWeight: '600',
   },
   claimComment: {
     fontSize: 14,
-    color: '#1e293b',
+    color: Theme.colors.textPrimary,
     fontStyle: 'italic',
   },
   rhBox: {
     marginTop: 10,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: Theme.colors.background,
     padding: 10,
-    borderRadius: 10,
+    borderRadius: Theme.radius.sm,
     borderLeftWidth: 3,
-    borderLeftColor: '#6366f1',
+    borderLeftColor: Theme.colors.primary,
   },
   rhTitle: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#4338ca',
+    color: Theme.colors.primary,
     marginBottom: 2,
   },
   rhText: {
     fontSize: 13,
-    color: '#334155',
+    color: Theme.colors.textPrimary,
   },
 });
