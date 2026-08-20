@@ -22,7 +22,7 @@ import {
   FileText,
   Info,
 } from 'lucide-react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useAppStore } from '../../store/useAppStore';
 import DayDetailModal, { DayDetailData } from '../../components/DayDetailModal';
 import AnomalyModal from '../../components/AnomalyModal';
@@ -49,12 +49,22 @@ export default function MaPresenceScreen() {
     myAnomalies,
   } = useAppStore();
 
+  const { highlightId } = useLocalSearchParams<{ highlightId?: string }>();
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedDayDetail, setSelectedDayDetail] = useState<DayDetailData | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showAnomalyModal, setShowAnomalyModal] = useState(false);
   const [anomalyInitialDate, setAnomalyInitialDate] = useState<string | undefined>();
+  const [anomalyTab, setAnomalyTab] = useState<'form' | 'list'>('form');
   const [showNotifs, setShowNotifs] = useState(false);
+
+  // Open AnomalyModal automatically when navigating with highlightId
+  useEffect(() => {
+    if (!highlightId) return;
+    setAnomalyTab('list');
+    setShowAnomalyModal(true);
+  }, [highlightId]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
   const pendingAnomaliesCount = myAnomalies.filter((a) => a.status === 'pending').length;
@@ -433,8 +443,15 @@ export default function MaPresenceScreen() {
       {/* Anomaly Modal */}
       <AnomalyModal
         visible={showAnomalyModal}
-        onClose={() => setShowAnomalyModal(false)}
+        onClose={() => {
+          setShowAnomalyModal(false);
+          if (highlightId) {
+            router.setParams({ highlightId: undefined });
+          }
+        }}
         initialDate={anomalyInitialDate}
+        initialTab={anomalyTab}
+        highlightId={highlightId}
       />
 
       {/* Notifications Modal */}

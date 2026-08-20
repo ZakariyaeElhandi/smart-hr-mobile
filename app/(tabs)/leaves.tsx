@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -31,7 +32,7 @@ import {
   RotateCcw,
 } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useAppStore, LeaveRequest } from '../../store/useAppStore';
 import { apiCreateLeave } from '../../utils/api';
 import CalendarModal, { DayMark } from '../../components/CalendarModal';
@@ -76,10 +77,50 @@ function daysBetween(start: Date, end: Date): number {
 
 export default function LeavesScreen() {
   const { logout, addLeaveRequest, leaveRequests, refreshData } = useAppStore();
+  const { highlightId } = useLocalSearchParams<{ highlightId?: string }>();
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+
+  // Scroll & Highlighting State
+  const scrollViewRef = useRef<ScrollView>(null);
+  const itemYPositions = useRef<Record<string, number>>({});
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Handle Contextual Scroll & Highlight when highlightId param arrives
+  useEffect(() => {
+    if (!highlightId || leaveRequests.length === 0) return;
+
+    const targetIdStr = highlightId.toString();
+    const itemExists = leaveRequests.some((r) => r.id.toString() === targetIdStr);
+
+    if (itemExists) {
+      const timer = setTimeout(() => {
+        const yPos = itemYPositions.current[targetIdStr];
+        if (yPos !== undefined && scrollViewRef.current) {
+          scrollViewRef.current.scrollTo({ y: Math.max(0, yPos - 120), animated: true });
+        }
+        setHighlightedId(targetIdStr);
+        fadeAnim.setValue(1);
+
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 2500,
+          useNativeDriver: false,
+        }).start(() => {
+          setHighlightedId(null);
+          router.setParams({ highlightId: undefined });
+        });
+      }, 350);
+
+      return () => clearTimeout(timer);
+    } else {
+      router.setParams({ highlightId: undefined });
+    }
+  }, [highlightId, leaveRequests]);
 
   // Date state setup
   const getTomorrow = () => {
@@ -240,55 +281,56 @@ export default function LeavesScreen() {
   const daysRequested = daysBetween(startDate, endDate);
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <View style={styles.container}>
-        {/* Top Header */}
-        <LinearGradient colors={['#1a1a2e', '#16213e']} style={styles.header}>
-          <Text style={styles.headerTitle}>Congés & Absences</Text>
-          <Text style={styles.headerSub}>Gérez et suivez l'ensemble de vos demandes d'absence</Text>
+    <View style={styles.container}>
+      {/* Top Header */}
+      <LinearGradient colors={['#1a1a2e', '#16213e']} style={styles.header}>
+        <Text style={styles.headerTitle}>Congés & Absences</Text>
+        <Text style={styles.headerSub}>Gérez et suivez l'ensemble de vos demandes d'absence</Text>
 
-          {/* Leave Balance Card */}
-          <View style={styles.balanceCard}>
-            <View style={styles.balanceRow}>
-              <View>
-                <Text style={styles.balanceLabel}>SOLDE DISPONIBLE</Text>
-                <Text style={styles.balanceDays}>22 Jours</Text>
-              </View>
-              <View style={styles.iconCircle}>
-                <Umbrella color="#6366f1" size={28} />
-              </View>
+        {/* Leave Balance Card */}
+        <View style={styles.balanceCard}>
+          <View style={styles.balanceRow}>
+            <View>
+              <Text style={styles.balanceLabel}>SOLDE DISPONIBLE</Text>
+              <Text style={styles.balanceDays}>22 Jours</Text>
             </View>
-            <View style={styles.divider} />
-            <View style={styles.balanceBreakdown}>
-              <View style={styles.balanceStat}>
-                <Text style={[styles.balanceStatVal, { color: '#15803d' }]}>{approvedCount}</Text>
-                <Text style={styles.balanceStatLabel}>Approuvées</Text>
-              </View>
-              <View style={styles.balanceStat}>
-                <Text style={[styles.balanceStatVal, { color: '#b45309' }]}>{pendingCount}</Text>
-                <Text style={styles.balanceStatLabel}>En attente</Text>
-              </View>
-              <View style={styles.balanceStat}>
-                <Text style={[styles.balanceStatVal, { color: '#6366f1' }]}>{leaveRequests.length}</Text>
-                <Text style={styles.balanceStatLabel}>Total</Text>
-              </View>
+            <View style={styles.iconCircle}>
+              <Umbrella color="#6366f1" size={28} />
             </View>
           </View>
-        </LinearGradient>
+          <View style={styles.divider} />
+          <View style={styles.balanceBreakdown}>
+            <View style={styles.balanceStat}>
+              <Text style={[styles.balanceStatVal, { color: '#15803d' }]}>{approvedCount}</Text>
+              <Text style={styles.balanceStatLabel}>Approuvées</Text>
+            </View>
+            <View style={styles.balanceStat}>
+              <Text style={[styles.balanceStatVal, { color: '#b45309' }]}>{pendingCount}</Text>
+              <Text style={styles.balanceStatLabel}>En attente</Text>
+            </View>
+            <View style={styles.balanceStat}>
+              <Text style={[styles.balanceStatVal, { color: '#6366f1' }]}>{leaveRequests.length}</Text>
+              <Text style={styles.balanceStatLabel}>Total</Text>
+            </View>
+          </View>
+        </View>
+      </LinearGradient>
 
-        <ScrollView
-          style={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={handleRefresh}
-              tintColor="#6366f1"
-              colors={['#6366f1']}
-            />
-          }
-        >
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor="#6366f1"
+            colors={['#6366f1']}
+          />
+        }
+      >
           {/* Action Buttons */}
           <View style={styles.section}>
             <View style={styles.actionRow}>
@@ -317,8 +359,37 @@ export default function LeavesScreen() {
               leaveRequests.map((req) => {
                 const displayStatus = mapStatus(req.status as string);
                 const s = STATUS_COLORS[displayStatus];
+                const isHighlighted = highlightedId === req.id.toString();
+
+                const interpolatedBorder = fadeAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['#e2e8f0', '#6366f1'],
+                });
+                const interpolatedBg = fadeAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['#ffffff', '#e0e7ff'],
+                });
+
                 return (
-                  <View key={req.id} style={styles.reqCard}>
+                  <Animated.View
+                    key={req.id}
+                    onLayout={(e) => {
+                      itemYPositions.current[req.id.toString()] = e.nativeEvent.layout.y;
+                    }}
+                    style={[
+                      styles.reqCard,
+                      isHighlighted && {
+                        borderColor: interpolatedBorder,
+                        borderWidth: 2,
+                        backgroundColor: interpolatedBg,
+                        shadowColor: '#6366f1',
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.25,
+                        shadowRadius: 8,
+                        elevation: 5,
+                      },
+                    ]}
+                  >
                     <View style={[styles.reqIconBox, { backgroundColor: s.bg }]}>
                       {s.icon}
                     </View>
@@ -341,7 +412,7 @@ export default function LeavesScreen() {
                     <View style={[styles.reqBadge, { backgroundColor: s.bg }]}>
                       <Text style={[styles.reqBadgeText, { color: s.text }]}>{displayStatus}</Text>
                     </View>
-                  </View>
+                  </Animated.View>
                 );
               })
             )}
@@ -520,7 +591,6 @@ export default function LeavesScreen() {
           </TouchableWithoutFeedback>
         </Modal>
       </View>
-    </TouchableWithoutFeedback>
   );
 }
 
@@ -551,6 +621,7 @@ const styles = StyleSheet.create({
   balanceStatLabel: { color: '#64748b', fontSize: 11, marginTop: 2, fontWeight: '600' },
 
   scroll: { flex: 1, marginTop: -50 },
+  scrollContent: { flexGrow: 1, paddingBottom: 140 },
   section: { paddingHorizontal: 20, marginTop: 16 },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: '#0f172a', marginBottom: 12 },
   actionRow: { flexDirection: 'row', gap: 12 },

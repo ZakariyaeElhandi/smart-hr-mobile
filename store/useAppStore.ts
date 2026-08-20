@@ -38,6 +38,8 @@ export interface Notification {
   title: string;
   message: string;
   type: 'approved' | 'refused' | 'info';
+  category: 'leave' | 'document' | 'anomaly';
+  relatedId: string | number;
   timestamp: Date;
   read: boolean;
 }
@@ -105,12 +107,19 @@ interface AppState {
   addLeaveRequest: (request: LeaveRequest) => void;
   setAttendances: (records: AttendanceRecord[]) => void;
   markNotificationsRead: () => void;
+  markSingleNotificationRead: (id: string) => void;
 }
 
-function buildNotifications(leaves: LeaveRequest[], existing: Notification[]): Notification[] {
+function buildNotifications(
+  leaves: LeaveRequest[],
+  documents: DocumentRequestRecord[],
+  anomalies: AnomalyRecord[],
+  existing: Notification[]
+): Notification[] {
   const readIds = new Set(existing.filter((n) => n.read).map((n) => n.id));
   const notifs: Notification[] = [];
 
+  // 1. Leaves
   leaves.forEach((l) => {
     const isApproved = l.status === 'validate' || l.status === 'Approved';
     const isRefused  = l.status === 'refuse'   || l.status === 'Denied';
@@ -119,20 +128,83 @@ function buildNotifications(leaves: LeaveRequest[], existing: Notification[]): N
     if (!isApproved && !isRefused && !isPending) return;
 
     const id = `leave-${l.id}`;
-    const title = isApproved ? '✅ Leave Approved'
-      : isRefused ? '❌ Leave Refused'
-      : '⏳ Leave Pending Review';
+    const title = isApproved ? '✅ Congé Approuvé'
+      : isRefused ? '❌ Congé Refusé'
+      : '⏳ Congé en Attente';
     const message = isApproved
-      ? `Your ${l.leaveType ?? 'leave'} request (${l.startDate} → ${l.endDate}) was approved.`
+      ? `Votre demande de ${l.leaveType ?? 'congé'} (${l.startDate} → ${l.endDate}) a été approuvée.`
       : isRefused
-      ? `Your ${l.leaveType ?? 'leave'} request (${l.startDate} → ${l.endDate}) was refused.`
-      : `Your ${l.leaveType ?? 'leave'} request (${l.startDate} → ${l.endDate}) is awaiting approval.`;
+      ? `Votre demande de ${l.leaveType ?? 'congé'} (${l.startDate} → ${l.endDate}) a été refusée.`
+      : `Votre demande de ${l.leaveType ?? 'congé'} (${l.startDate} → ${l.endDate}) est en cours d'examen.`;
 
     notifs.push({
       id,
       title,
       message,
       type: isApproved ? 'approved' : isRefused ? 'refused' : 'info',
+      category: 'leave',
+      relatedId: l.id,
+      timestamp: new Date(),
+      read: readIds.has(id),
+    });
+  });
+
+  // 2. Documents
+  documents.forEach((doc) => {
+    const isReady = doc.status === 'ready' || doc.status === 'delivered';
+    const isRejected = doc.status === 'rejected';
+    const isProcessing = doc.status === 'processing' || doc.status === 'pending';
+
+    if (!isReady && !isRejected && !isProcessing) return;
+
+    const id = `doc-${doc.id}`;
+    const docLabel = doc.document_type_label || doc.custom_type_label || 'Document';
+    const title = isReady ? '📄 Document Disponible'
+      : isRejected ? '❌ Demande de Document Refusée'
+      : '⏳ Demande de Document en Traitement';
+    const message = isReady
+      ? `Votre document "${docLabel}" est prêt à être téléchargé.`
+      : isRejected
+      ? `Votre demande pour "${docLabel}" a été refusée${doc.rejection_reason ? ' : ' + doc.rejection_reason : '.'}`
+      : `Votre demande pour "${docLabel}" est en cours de traitement.`;
+
+    notifs.push({
+      id,
+      title,
+      message,
+      type: isReady ? 'approved' : isRejected ? 'refused' : 'info',
+      category: 'document',
+      relatedId: doc.id,
+      timestamp: new Date(),
+      read: readIds.has(id),
+    });
+  });
+
+  // 3. Anomalies
+  anomalies.forEach((a) => {
+    const isResolved = a.status === 'resolved' || a.resolved;
+    const isRejected = a.status === 'rejected';
+    const isPending = a.status === 'pending';
+
+    if (!isResolved && !isRejected && !isPending) return;
+
+    const id = `anomaly-${a.id}`;
+    const title = isResolved ? '✅ Signalement Résolu'
+      : isRejected ? '❌ Signalement Non Retenu'
+      : '⚠️ Signalement Enregistré';
+    const message = isResolved
+      ? `Votre réclamation d'anomalie du ${a.date_concerned || 'jour'} a été traitée par les RH.`
+      : isRejected
+      ? `Votre réclamation d'anomalie du ${a.date_concerned || 'jour'} n'a pas été retenue.`
+      : `Votre réclamation du ${a.date_concerned || 'jour'} a bien été prise en compte.`;
+
+    notifs.push({
+      id,
+      title,
+      message,
+      type: isResolved ? 'approved' : isRejected ? 'refused' : 'info',
+      category: 'anomaly',
+      relatedId: a.id,
       timestamp: new Date(),
       read: readIds.has(id),
     });
@@ -296,10 +368,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   refreshData: async () => {
     const { user, selectedMonth, selectedYear } = get();
 
+    let fetchedLeaves: LeaveRequest[] = [];
+    let fetchedDocs: DocumentRequestRecord[] = [];
+    let fetchedAnomalies: AnomalyRecord[] = [];
+
     // Fetch leaves
     try {
       const rawLeaves = await apiGetLeaves();
-      const mapped: LeaveRequest[] = rawLeaves.map((l: any) => ({
+      fetchedLeaves = rawLeaves.map((l: any) => ({
         id: l.id,
         startDate: l.date_from ? l.date_from.split('T')[0] : '',
         endDate: l.date_to ? l.date_to.split('T')[0] : '',
@@ -309,17 +385,22 @@ export const useAppStore = create<AppState>((set, get) => ({
         numberOfDays: l.number_of_days,
         aiRecommendation: l.ai_recommendation,
       }));
-      const notifs = buildNotifications(mapped, get().notifications);
-      set({ leaveRequests: mapped, notifications: notifs });
+      set({ leaveRequests: fetchedLeaves });
     } catch (_) {}
 
     // Fetch document requests
-    get().fetchDocumentRequests();
+    try {
+      fetchedDocs = await apiGetDocumentRequests();
+      set({ documentRequests: fetchedDocs });
+    } catch (_) {}
 
     if (user.employeeId) {
       // Fetch monthly attendance + anomalies
       get().fetchMonthlyAttendance(selectedMonth, selectedYear);
-      get().fetchMyAnomalies();
+      try {
+        fetchedAnomalies = await apiGetMyAnomalies();
+        set({ myAnomalies: fetchedAnomalies });
+      } catch (_) {}
 
       // Fetch appraisals + AI analysis
       try {
@@ -331,6 +412,15 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       } catch (_) {}
     }
+
+    // Build consolidated notifications
+    const notifs = buildNotifications(
+      fetchedLeaves,
+      fetchedDocs,
+      fetchedAnomalies,
+      get().notifications
+    );
+    set({ notifications: notifs });
   },
 
   setLeaveRequests: (requests) => set({ leaveRequests: requests }),
@@ -340,5 +430,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   markNotificationsRead: () =>
     set((s) => ({
       notifications: s.notifications.map((n) => ({ ...n, read: true })),
+    })),
+  markSingleNotificationRead: (id: string) =>
+    set((s) => ({
+      notifications: s.notifications.map((n) =>
+        n.id === id ? { ...n, read: true } : n
+      ),
     })),
 }));

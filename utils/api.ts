@@ -7,8 +7,27 @@ const BASE_URL =
 export const ACCESS_TOKEN_KEY = "smart_hr_access_token";
 export const REFRESH_TOKEN_KEY = "smart_hr_refresh_token";
 
-// ─── Core fetch with automatic Bearer header + 401 token refresh ──────────────
-let isRefreshing = false;
+// ─── Core fetch with automatic Bearer header + 401 token refresh (Mutex protected) ─
+let refreshTokenPromise: Promise<string> | null = null;
+
+async function performTokenRefresh(): Promise<string> {
+  const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+  if (!refreshToken) throw new Error("No refresh token");
+
+  const refreshRes = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+
+  if (!refreshRes.ok) throw new Error("Refresh failed");
+
+  const data = await refreshRes.json();
+  await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, data.access_token);
+  await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, data.refresh_token);
+
+  return data.access_token as string;
+}
 
 export async function apiFetch(
   path: string,
@@ -26,35 +45,23 @@ export async function apiFetch(
 
   const response = await fetch(`${BASE_URL}${path}`, { ...options, headers });
 
-  // If unauthorized and we aren't already refreshing, attempt a token refresh
-  if (response.status === 401 && !isRefreshing) {
-    isRefreshing = true;
+  // If unauthorized, wait for or trigger a single shared token refresh
+  if (response.status === 401) {
     try {
-      const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
-      if (!refreshToken) throw new Error("No refresh token");
+      if (!refreshTokenPromise) {
+        refreshTokenPromise = performTokenRefresh().finally(() => {
+          refreshTokenPromise = null;
+        });
+      }
 
-      const refreshRes = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token: refreshToken }),
-      });
-
-      if (!refreshRes.ok) throw new Error("Refresh failed");
-
-      const data = await refreshRes.json();
-      await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, data.access_token);
-      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, data.refresh_token);
-
-      // Retry original request with new token
-      headers["Authorization"] = `Bearer ${data.access_token}`;
+      const newAccessToken = await refreshTokenPromise;
+      headers["Authorization"] = `Bearer ${newAccessToken}`;
       return fetch(`${BASE_URL}${path}`, { ...options, headers });
     } catch {
       // Refresh failed — clear tokens so app redirects to login
       await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
       await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
       throw new Error("SESSION_EXPIRED");
-    } finally {
-      isRefreshing = false;
     }
   }
 

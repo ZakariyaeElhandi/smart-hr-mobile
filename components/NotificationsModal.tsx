@@ -29,8 +29,30 @@ function timeAgo(date: Date): string {
   return `Il y a ${Math.floor(diff / 86400)} j`;
 }
 
+import { router } from 'expo-router';
+import { useAppStore } from '../store/useAppStore';
+
 export default function NotificationsModal({ visible, onClose, notifications, onMarkRead }: Props) {
   const unread = notifications.filter((n) => !n.read).length;
+  const markSingleNotificationRead = useAppStore((s) => s.markSingleNotificationRead);
+
+  const handleNotificationPress = (notif: Notification) => {
+    // 1. Optimistic update: mark read
+    markSingleNotificationRead(notif.id);
+
+    // 2. Close modal
+    onClose();
+
+    // 3. Contextual Navigation with Expo Router
+    const targetId = notif.relatedId;
+    if (notif.category === 'leave') {
+      router.push(`/(tabs)/leaves?highlightId=${targetId}`);
+    } else if (notif.category === 'document') {
+      router.push(`/(tabs)/documents?highlightId=${targetId}`);
+    } else if (notif.category === 'anomaly') {
+      router.push(`/(tabs)?highlightId=${targetId}`);
+    }
+  };
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -77,7 +99,12 @@ export default function NotificationsModal({ visible, onClose, notifications, on
                 const isApproved = notif.type === 'approved';
                 const isRefused = notif.type === 'refused';
                 return (
-                  <View key={notif.id} style={[styles.card, !notif.read && styles.cardUnread]}>
+                  <TouchableOpacity
+                    key={notif.id}
+                    activeOpacity={0.7}
+                    onPress={() => handleNotificationPress(notif)}
+                    style={[styles.card, !notif.read && styles.cardUnread]}
+                  >
                     <View
                       style={[
                         styles.iconBox,
@@ -100,7 +127,7 @@ export default function NotificationsModal({ visible, onClose, notifications, on
                       <Text style={styles.cardMessage}>{notif.message}</Text>
                       <Text style={styles.cardTime}>{timeAgo(notif.timestamp)}</Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 );
               })
             )}

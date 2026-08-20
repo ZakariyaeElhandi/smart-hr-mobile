@@ -1,4 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
+import { router, useLocalSearchParams } from "expo-router";
 import {
   AlertCircle,
   CheckCircle,
@@ -10,10 +11,11 @@ import {
   X,
   XCircle,
 } from "lucide-react-native";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -100,10 +102,55 @@ const STATUS_MAP: Record<
 export default function DocumentsScreen() {
   const { documentRequests, submitDocumentRequest, fetchDocumentRequests } =
     useAppStore();
+  const { highlightId } = useLocalSearchParams<{ highlightId?: string }>();
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+
+  // Scroll & Highlighting State
+  const scrollViewRef = useRef<ScrollView>(null);
+  const itemYPositions = useRef<Record<string, number>>({});
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Handle Contextual Scroll & Highlight when highlightId param arrives
+  useEffect(() => {
+    if (!highlightId || documentRequests.length === 0) return;
+
+    const targetIdStr = highlightId.toString();
+    const itemExists = documentRequests.some(
+      (doc) => doc.id.toString() === targetIdStr,
+    );
+
+    if (itemExists) {
+      const timer = setTimeout(() => {
+        const yPos = itemYPositions.current[targetIdStr];
+        if (yPos !== undefined && scrollViewRef.current) {
+          scrollViewRef.current.scrollTo({
+            y: Math.max(0, yPos - 120),
+            animated: true,
+          });
+        }
+        setHighlightedId(targetIdStr);
+        fadeAnim.setValue(1);
+
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 2500,
+          useNativeDriver: false,
+        }).start(() => {
+          setHighlightedId(null);
+          router.setParams({ highlightId: undefined });
+        });
+      }, 350);
+
+      return () => clearTimeout(timer);
+    } else {
+      router.setParams({ highlightId: undefined });
+    }
+  }, [highlightId, documentRequests]);
 
   // Form state
   const [selectedDocType, setSelectedDocType] = useState<
@@ -197,67 +244,68 @@ export default function DocumentsScreen() {
   ).length;
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <View style={styles.container}>
-        {/* Header */}
-        <LinearGradient colors={["#1a1a2e", "#16213e"]} style={styles.header}>
-          <Text style={styles.headerTitle}>Documents Administratifs</Text>
-          <Text style={styles.headerSub}>
-            Demandez et téléchargez vos attestations & bulletins de paie
-          </Text>
+    <View style={styles.container}>
+      {/* Header */}
+      <LinearGradient colors={["#1a1a2e", "#16213e"]} style={styles.header}>
+        <Text style={styles.headerTitle}>Documents Administratifs</Text>
+        <Text style={styles.headerSub}>
+          Demandez et téléchargez vos attestations & bulletins de paie
+        </Text>
 
-          {/* Overview Card */}
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryRow}>
-              <View>
-                <Text style={styles.summaryLabel}>
-                  MES DEMANDES DE DOCUMENTS
-                </Text>
-                <Text style={styles.summaryTotal}>
-                  {documentRequests.length} au total
-                </Text>
-              </View>
-              <View style={styles.iconCircle}>
-                <FileText color="#6366f1" size={28} />
-              </View>
+        {/* Overview Card */}
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryRow}>
+            <View>
+              <Text style={styles.summaryLabel}>
+                MES DEMANDES DE DOCUMENTS
+              </Text>
+              <Text style={styles.summaryTotal}>
+                {documentRequests.length} au total
+              </Text>
             </View>
-            <View style={styles.divider} />
-            <View style={styles.summaryBreakdown}>
-              <View style={styles.summaryStat}>
-                <Text style={[styles.summaryStatVal, { color: "#b45309" }]}>
-                  {pendingCount}
-                </Text>
-                <Text style={styles.summaryStatLabel}>En cours</Text>
-              </View>
-              <View style={styles.summaryStat}>
-                <Text style={[styles.summaryStatVal, { color: "#15803d" }]}>
-                  {readyCount}
-                </Text>
-                <Text style={styles.summaryStatLabel}>Prêts / Délivrés</Text>
-              </View>
-              <View style={styles.summaryStat}>
-                <Text style={[styles.summaryStatVal, { color: "#6366f1" }]}>
-                  {documentRequests.length}
-                </Text>
-                <Text style={styles.summaryStatLabel}>Total</Text>
-              </View>
+            <View style={styles.iconCircle}>
+              <FileText color="#6366f1" size={28} />
             </View>
           </View>
-        </LinearGradient>
+          <View style={styles.divider} />
+          <View style={styles.summaryBreakdown}>
+            <View style={styles.summaryStat}>
+              <Text style={[styles.summaryStatVal, { color: "#b45309" }]}>
+                {pendingCount}
+              </Text>
+              <Text style={styles.summaryStatLabel}>En cours</Text>
+            </View>
+            <View style={styles.summaryStat}>
+              <Text style={[styles.summaryStatVal, { color: "#15803d" }]}>
+                {readyCount}
+              </Text>
+              <Text style={styles.summaryStatLabel}>Prêts / Délivrés</Text>
+            </View>
+            <View style={styles.summaryStat}>
+              <Text style={[styles.summaryStatVal, { color: "#6366f1" }]}>
+                {documentRequests.length}
+              </Text>
+              <Text style={styles.summaryStatLabel}>Total</Text>
+            </View>
+          </View>
+        </View>
+      </LinearGradient>
 
-        <ScrollView
-          style={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={handleRefresh}
-              tintColor="#6366f1"
-              colors={["#6366f1"]}
-            />
-          }
-        >
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor="#6366f1"
+            colors={["#6366f1"]}
+          />
+        }
+      >
           {/* Action button */}
           <View style={styles.section}>
             <TouchableOpacity
@@ -293,8 +341,38 @@ export default function DocumentsScreen() {
             ) : (
               documentRequests.map((doc) => {
                 const s = STATUS_MAP[doc.status] || STATUS_MAP.pending;
+                const isHighlighted = highlightedId === doc.id.toString();
+
+                const interpolatedBorder = fadeAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ["#e2e8f0", "#6366f1"],
+                });
+                const interpolatedBg = fadeAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ["#ffffff", "#e0e7ff"],
+                });
+
                 return (
-                  <View key={doc.id} style={styles.docCard}>
+                  <Animated.View
+                    key={doc.id}
+                    onLayout={(e) => {
+                      itemYPositions.current[doc.id.toString()] =
+                        e.nativeEvent.layout.y;
+                    }}
+                    style={[
+                      styles.docCard,
+                      isHighlighted && {
+                        borderColor: interpolatedBorder,
+                        borderWidth: 2,
+                        backgroundColor: interpolatedBg,
+                        shadowColor: "#6366f1",
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.25,
+                        shadowRadius: 8,
+                        elevation: 5,
+                      },
+                    ]}
+                  >
                     <View style={styles.docTop}>
                       <View style={styles.docLeft}>
                         <View
@@ -367,7 +445,7 @@ export default function DocumentsScreen() {
                         </Text>
                       </TouchableOpacity>
                     )}
-                  </View>
+                  </Animated.View>
                 );
               })
             )}
@@ -542,7 +620,6 @@ export default function DocumentsScreen() {
           </TouchableWithoutFeedback>
         </Modal>
       </View>
-    </TouchableWithoutFeedback>
   );
 }
 
@@ -604,6 +681,7 @@ const styles = StyleSheet.create({
   },
 
   scroll: { flex: 1, marginTop: -50 },
+  scrollContent: { flexGrow: 1, paddingBottom: 140 },
   section: { paddingHorizontal: 20, marginTop: 16 },
   sectionTitle: {
     fontSize: 18,

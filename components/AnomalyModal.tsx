@@ -22,12 +22,14 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   initialDate?: string;
+  initialTab?: 'form' | 'list';
+  highlightId?: string;
 }
 
-export default function AnomalyModal({ visible, onClose, initialDate }: Props) {
+export default function AnomalyModal({ visible, onClose, initialDate, initialTab, highlightId }: Props) {
   const { submitAnomalyClaim, myAnomalies, fetchMyAnomalies } = useAppStore();
 
-  const [activeTab, setActiveTab] = useState<'form' | 'list'>('form');
+  const [activeTab, setActiveTab] = useState<'form' | 'list'>(initialTab || 'form');
   const [date, setDate] = useState(initialDate || new Date().toISOString().split('T')[0]);
   const [comment, setComment] = useState('');
   const [attachmentName, setAttachmentName] = useState<string | null>(null);
@@ -39,6 +41,12 @@ export default function AnomalyModal({ visible, onClose, initialDate }: Props) {
       setDate(initialDate);
     }
   }, [initialDate]);
+
+  React.useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab, visible]);
 
   const handleSimulateAttachment = () => {
     setAttachmentName('justificatif_presence.jpg');
@@ -181,7 +189,11 @@ export default function AnomalyModal({ visible, onClose, initialDate }: Props) {
                       </View>
                     ) : (
                       myAnomalies.map((item) => (
-                        <ClaimCard key={item.id} item={item} />
+                        <ClaimCard
+                          key={item.id}
+                          item={item}
+                          isHighlighted={highlightId !== undefined && item.id.toString() === highlightId.toString()}
+                        />
                       ))
                     )}
                   </View>
@@ -196,7 +208,7 @@ export default function AnomalyModal({ visible, onClose, initialDate }: Props) {
   );
 }
 
-function ClaimCard({ item }: { item: AnomalyRecord }) {
+function ClaimCard({ item, isHighlighted }: { item: AnomalyRecord; isHighlighted?: boolean }) {
   const isResolved = item.status === 'resolved' || item.resolved;
   const isRejected = item.status === 'rejected';
 
@@ -205,7 +217,16 @@ function ClaimCard({ item }: { item: AnomalyRecord }) {
   const statusLabel = isResolved ? 'Traité / Validé' : isRejected ? 'Rejeté' : 'En attente RH';
 
   return (
-    <View style={styles.claimCard}>
+    <View
+      style={[
+        styles.claimCard,
+        isHighlighted && {
+          borderColor: '#6366f1',
+          borderWidth: 2,
+          backgroundColor: '#e0e7ff',
+        },
+      ]}
+    >
       <View style={styles.claimHeader}>
         <View style={[styles.badge, { backgroundColor: badgeBg }]}>
           {isResolved ? (
