@@ -1,8 +1,11 @@
 import { Tabs } from 'expo-router';
 import { Clock, Calendar, FileText, TrendingUp } from 'lucide-react-native';
 import { Theme } from '../../constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
@@ -17,8 +20,8 @@ export default function TabLayout() {
           shadowOpacity: 0.04,
           shadowRadius: 12,
           elevation: 8,
-          height: 72,
-          paddingBottom: 12,
+          height: 60 + insets.bottom,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
           paddingTop: 8,
         },
         tabBarLabelStyle: {
