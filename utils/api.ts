@@ -282,7 +282,7 @@ export async function apiGetAppraisals(
 export async function apiGetAppraisalAnalysis(
   appraisalId: number,
 ): Promise<AppraisalRecord> {
-  const res = await apiFetch(`/api/v1/appraisal/${appraisalId}`);
+  const res = await apiFetch(`/api/v1/appraisals/${appraisalId}/analysis`);
   if (!res.ok) throw new Error("Failed to fetch appraisal analysis");
   return res.json();
 }
