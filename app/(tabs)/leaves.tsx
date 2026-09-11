@@ -68,7 +68,10 @@ function mapStatus(status: string): string {
   return 'En attente';
 }
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 export default function LeavesScreen() {
+  const insets = useSafeAreaInsets();
   const { leaveRequests, addLeaveRequest, refreshData, logout } = useAppStore();
   const { highlightId } = useLocalSearchParams<{ highlightId?: string }>();
 
@@ -258,9 +261,9 @@ export default function LeavesScreen() {
   const daysRequested = daysBetween(startDate, endDate);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right }]}>
       {/* Top Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top + 10, 52) }]}>
         <Text style={styles.headerTitle}>Congés & Absences</Text>
         <Text style={styles.headerSub}>Gérez et suivez l'ensemble de vos demandes d'absence</Text>
 

@@ -44,7 +44,10 @@ function formatHeaderDate(date: Date): string {
   return date.toLocaleDateString('en-US', options);
 }
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 export default function MaPresenceScreen() {
+  const insets = useSafeAreaInsets();
   const {
     user,
     logout,
@@ -255,9 +258,9 @@ export default function MaPresenceScreen() {
   const hoursFormatted = `${Math.floor(totalHrs)}h ${Math.round((totalHrs % 1) * 60)}m`;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right }]}>
       {/* Top Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top + 10, 52) }]}>
         <View style={styles.headerTop}>
           <View>
             <View style={styles.datePill}>

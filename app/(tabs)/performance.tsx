@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
+  Modal,
+  Animated,
 } from 'react-native';
 import {
   TrendingUp,
@@ -17,6 +19,7 @@ import {
   RefreshCw,
   AlertCircle,
   Sparkles,
+  ChevronRight,
 } from 'lucide-react-native';
 import { useAppStore } from '../../store/useAppStore';
 import { Theme } from '../../constants/theme';
@@ -36,9 +39,49 @@ function ScoreRing({ score, color }: { score: number; color: string }) {
   );
 }
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 export default function PerformanceScreen() {
+  const insets = useSafeAreaInsets();
   const { user, appraisals, appraisalDetail, refreshData } = useAppStore();
   const [refreshing, setRefreshing] = useState(false);
+
+  // Animated Modal State
+  const [modalVisible, setModalVisible] = useState(false);
+  const slideAnim = useRef(new Animated.Value(500)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  const openSummary = () => {
+    setModalVisible(true);
+    Animated.parallel([
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const closeSummary = () => {
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: 500,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start(() => setModalVisible(false));
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -66,9 +109,9 @@ export default function PerformanceScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top + 10, 52) }]}>
         <Text style={styles.headerTitle}>Mon Bilan & Performance</Text>
         <Text style={styles.headerSub}>Synthèses et recommandations de carrière</Text>
 
@@ -142,7 +185,16 @@ export default function PerformanceScreen() {
                   <Text style={styles.aiBadgeText}>Smart Assistant</Text>
                 </View>
               </View>
-              <Text style={styles.aiText}>{appraisalDetail.ai_summary}</Text>
+              
+              <Text style={styles.aiPreviewText} numberOfLines={2}>
+                {appraisalDetail.ai_summary}
+              </Text>
+              
+              <TouchableOpacity style={styles.aiOpenBtn} onPress={openSummary}>
+                <Text style={styles.aiOpenBtnText}>Lire l'analyse complète</Text>
+                <ChevronRight color={Theme.colors.primary} size={16} />
+              </TouchableOpacity>
+
               {appraisalDetail.ai_computed_on && (
                 <Text style={styles.aiDate}>
                   Généré le {new Date(appraisalDetail.ai_computed_on).toLocaleDateString('fr-FR')}
@@ -241,6 +293,31 @@ export default function PerformanceScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* AI Summary Modal */}
+      {modalVisible && (
+        <Modal visible transparent animationType="none" onRequestClose={closeSummary}>
+          <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
+            <TouchableOpacity style={StyleSheet.absoluteFill} onPress={closeSummary} activeOpacity={1} />
+            <Animated.View style={[styles.modalContent, { transform: [{ translateY: slideAnim }], paddingBottom: Math.max(insets.bottom, 24) }]}>
+              <View style={styles.modalDragHandle} />
+              <View style={styles.modalAiHeader}>
+                <IconCircle variant="purple" size={48}>
+                  <Sparkles color={Theme.colors.status.info.text} size={24} />
+                </IconCircle>
+                <View style={styles.modalAiTitleWrap}>
+                  <Text style={styles.modalAiTitle}>Synthèse d'Analyse RH</Text>
+                  <Text style={styles.modalAiSub}>Smart Assistant IA</Text>
+                </View>
+              </View>
+              <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+                <Text style={styles.modalAiText}>{appraisalDetail?.ai_summary}</Text>
+              </ScrollView>
+              <PrimaryButton title="Fermer" onPress={closeSummary} variant="black" style={styles.modalCloseBtn} />
+            </Animated.View>
+          </Animated.View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -407,10 +484,27 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
   },
-  aiText: {
-    color: Theme.colors.textPrimary,
+  aiPreviewText: {
+    color: Theme.colors.textSecondary,
     fontSize: 14,
     lineHeight: 22,
+    marginBottom: 16,
+  },
+  aiOpenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Theme.colors.background,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: Theme.radius.lg,
+  },
+  aiOpenBtnText: {
+    color: Theme.colors.primary,
+    fontSize: 14,
+    fontWeight: '700',
   },
   aiDate: {
     color: Theme.colors.textSecondary,
@@ -477,5 +571,64 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     gap: Theme.spacing.md,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: Theme.colors.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: Theme.spacing.xl,
+    paddingTop: Theme.spacing.md,
+    maxHeight: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 20,
+  },
+  modalDragHandle: {
+    width: 40,
+    height: 5,
+    backgroundColor: Theme.colors.border,
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  modalAiHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 20,
+  },
+  modalAiTitleWrap: {
+    flex: 1,
+  },
+  modalAiTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Theme.colors.textPrimary,
+  },
+  modalAiSub: {
+    fontSize: 13,
+    color: Theme.colors.primary,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  modalScroll: {
+    marginBottom: 20,
+  },
+  modalAiText: {
+    fontSize: 15,
+    lineHeight: 24,
+    color: Theme.colors.textPrimary,
+  },
+  modalCloseBtn: {
+    marginTop: 8,
   },
 });

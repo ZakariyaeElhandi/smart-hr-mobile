@@ -81,7 +81,10 @@ const STATUS_MAP: Record<string, { label: string; statusType: string }> = {
   rejected: { label: "Refusé", statusType: "rejected" },
 };
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 export default function DocumentsScreen() {
+  const insets = useSafeAreaInsets();
   const { documentRequests, submitDocumentRequest, fetchDocumentRequests, refreshData, logout } = useAppStore();
   const { highlightId } = useLocalSearchParams<{ highlightId?: string }>();
 
@@ -212,9 +215,9 @@ export default function DocumentsScreen() {
   ).length;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top + 10, 52) }]}>
         <Text style={styles.headerTitle}>Documents Administratifs</Text>
         <Text style={styles.headerSub}>
           Demandez et téléchargez vos attestations & bulletins de paie
