@@ -1,50 +1,63 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { router, useLocalSearchParams } from "expo-router";
 import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  RefreshControl,
-  ActivityIndicator,
-} from 'react-native';
-import {
+  AlertTriangle,
+  Bell,
+  Calendar as CalendarIcon,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Clock,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  Calendar as CalendarIcon,
-  Bell,
-  LogOut,
   FileText,
-  Info,
-} from 'lucide-react-native';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useAppStore } from '../../store/useAppStore';
-import DayDetailModal, { DayDetailData } from '../../components/DayDetailModal';
-import AnomalyModal from '../../components/AnomalyModal';
-import NotificationsModal from '../../components/NotificationsModal';
-import { Theme } from '../../constants/theme';
-import { Card } from '../../components/ui/Card';
-import { StatCard } from '../../components/ui/StatCard';
-import { PrimaryButton } from '../../components/ui/PrimaryButton';
-import { IconCircle } from '../../components/ui/IconCircle';
+  LogOut,
+  XCircle
+} from "lucide-react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import AnomalyModal from "../../components/AnomalyModal";
+import DayDetailModal, { DayDetailData } from "../../components/DayDetailModal";
+import NotificationsModal from "../../components/NotificationsModal";
+import { Card } from "../../components/ui/Card";
+import { IconCircle } from "../../components/ui/IconCircle";
+import { PrimaryButton } from "../../components/ui/PrimaryButton";
+import { StatCard } from "../../components/ui/StatCard";
+import { Theme } from "../../constants/theme";
+import { useAppStore } from "../../store/useAppStore";
 
 const MONTHS_FR = [
-  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+  "Janvier",
+  "Février",
+  "Mars",
+  "Avril",
+  "Mai",
+  "Juin",
+  "Juillet",
+  "Août",
+  "Septembre",
+  "Octobre",
+  "Novembre",
+  "Décembre",
 ];
 
-const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+const WEEKDAYS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 
 function formatHeaderDate(date: Date): string {
-  const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
-  return date.toLocaleDateString('en-US', options);
+  const options: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  };
+  return date.toLocaleDateString("en-US", options);
 }
 
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function MaPresenceScreen() {
   const insets = useSafeAreaInsets();
@@ -64,22 +77,27 @@ export default function MaPresenceScreen() {
   const { highlightId } = useLocalSearchParams<{ highlightId?: string }>();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedDayDetail, setSelectedDayDetail] = useState<DayDetailData | null>(null);
+  const [selectedDayDetail, setSelectedDayDetail] =
+    useState<DayDetailData | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showAnomalyModal, setShowAnomalyModal] = useState(false);
-  const [anomalyInitialDate, setAnomalyInitialDate] = useState<string | undefined>();
-  const [anomalyTab, setAnomalyTab] = useState<'form' | 'list'>('form');
+  const [anomalyInitialDate, setAnomalyInitialDate] = useState<
+    string | undefined
+  >();
+  const [anomalyTab, setAnomalyTab] = useState<"form" | "list">("form");
   const [showNotifs, setShowNotifs] = useState(false);
 
   // Open AnomalyModal automatically when navigating with highlightId
   useEffect(() => {
     if (!highlightId) return;
-    setAnomalyTab('list');
+    setAnomalyTab("list");
     setShowAnomalyModal(true);
   }, [highlightId]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
-  const pendingAnomaliesCount = myAnomalies.filter((a) => a.status === 'pending').length;
+  const pendingAnomaliesCount = myAnomalies.filter(
+    (a) => a.status === "pending",
+  ).length;
 
   const now = new Date();
   const currentRealMonth = now.getMonth() + 1;
@@ -117,7 +135,7 @@ export default function MaPresenceScreen() {
 
   const handleLogout = async () => {
     await logout();
-    router.replace('/login');
+    router.replace("/login");
   };
 
   // Build daily status map for the calendar grid
@@ -136,7 +154,7 @@ export default function MaPresenceScreen() {
     const attMap: Record<string, any> = {};
     attendances.forEach((a) => {
       if (a.check_in) {
-        const dateStr = a.check_in.split('T')[0];
+        const dateStr = a.check_in.split("T")[0];
         attMap[dateStr] = a;
       }
     });
@@ -148,14 +166,14 @@ export default function MaPresenceScreen() {
         const cur = new Date(l.date_from);
         const end = new Date(l.date_to);
         while (cur <= end) {
-          const dateStr = cur.toISOString().split('T')[0];
+          const dateStr = cur.toISOString().split("T")[0];
           leaveSet.add(dateStr);
           cur.setDate(cur.getDate() + 1);
         }
       }
     });
 
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = now.toISOString().split("T")[0];
 
     const grid = [];
 
@@ -166,7 +184,7 @@ export default function MaPresenceScreen() {
 
     // Actual month days
     for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
       const dateObj = new Date(selectedYear, selectedMonth - 1, day);
       const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
 
@@ -174,31 +192,32 @@ export default function MaPresenceScreen() {
       const isLeave = leaveSet.has(dateStr);
       const isPast = dateStr <= todayStr;
 
-      let status: 'present' | 'late' | 'absent' | 'leave' | 'weekend' = 'weekend';
-      let statusLabel = 'Weekend / Non travaillé';
+      let status: "present" | "late" | "absent" | "leave" | "weekend" =
+        "weekend";
+      let statusLabel = "Weekend / Non travaillé";
       let color = Theme.colors.textSecondary;
       let bgColor = Theme.colors.background;
 
       if (isLeave) {
-        status = 'leave';
-        statusLabel = 'Congé / Jour férié';
+        status = "leave";
+        statusLabel = "Congé / Jour férié";
         color = Theme.colors.status.info.text;
         bgColor = Theme.colors.status.info.bg;
       } else if (attRecord) {
         if (attRecord.is_late) {
-          status = 'late';
-          statusLabel = 'Présent (Retard)';
+          status = "late";
+          statusLabel = "Présent (Retard)";
           color = Theme.colors.status.warning.text;
           bgColor = Theme.colors.status.warning.bg;
         } else {
-          status = 'present';
-          statusLabel = 'Présent';
+          status = "present";
+          statusLabel = "Présent";
           color = Theme.colors.status.success.text;
           bgColor = Theme.colors.status.success.bg;
         }
       } else if (!isWeekend && isPast) {
-        status = 'absent';
-        statusLabel = 'Absent / Non pointé';
+        status = "absent";
+        statusLabel = "Absent / Non pointé";
         color = Theme.colors.status.danger.text;
         bgColor = Theme.colors.status.danger.bg;
       }
@@ -242,7 +261,7 @@ export default function MaPresenceScreen() {
 
   const handleOpenAnomalyForDate = (data: DayDetailData) => {
     setAnomalyInitialDate(data.date);
-    setAnomalyTab('form');
+    setAnomalyTab("form");
     setShowAnomalyModal(true);
   };
 
@@ -258,15 +277,24 @@ export default function MaPresenceScreen() {
   const hoursFormatted = `${Math.floor(totalHrs)}h ${Math.round((totalHrs % 1) * 60)}m`;
 
   return (
-    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right }]}>
+    <View
+      style={[
+        styles.container,
+        { paddingLeft: insets.left, paddingRight: insets.right },
+      ]}
+    >
       {/* Top Header */}
-      <View style={[styles.header, { paddingTop: Math.max(insets.top + 10, 52) }]}>
+      <View
+        style={[styles.header, { paddingTop: Math.max(insets.top + 10, 52) }]}
+      >
         <View style={styles.headerTop}>
           <View>
             <View style={styles.datePill}>
               <Text style={styles.datePillText}>{formatHeaderDate(now)}</Text>
             </View>
-            <Text style={styles.welcomeText}>Bonjour, {user.name || 'Collaborateur'} 👋</Text>
+            <Text style={styles.welcomeText}>
+              Bonjour, {user.name || "Collaborateur"} 👋
+            </Text>
           </View>
           <View style={styles.headerActions}>
             <TouchableOpacity
@@ -288,11 +316,11 @@ export default function MaPresenceScreen() {
 
         {/* Quick Check-in Button (Premium Pill CTA) */}
         <PrimaryButton
-          title="Pointage de Présence"
+          title="Déclarer une anomalie"
           icon={<Clock color={Theme.colors.textWhite} size={20} />}
           onPress={() => {
-            setAnomalyInitialDate(now.toISOString().split('T')[0]);
-            setAnomalyTab('form');
+            setAnomalyInitialDate(now.toISOString().split("T")[0]);
+            setAnomalyTab("form");
             setShowAnomalyModal(true);
           }}
           variant="black"
@@ -335,14 +363,21 @@ export default function MaPresenceScreen() {
             <StatCard
               title="Présences"
               value={stats.present_days}
-              icon={<CheckCircle2 color={Theme.colors.status.success.text} size={20} />}
+              icon={
+                <CheckCircle2
+                  color={Theme.colors.status.success.text}
+                  size={20}
+                />
+              }
               variant="green"
               valueColor={Theme.colors.status.success.text}
             />
             <StatCard
               title="Retards"
               value={stats.late_days}
-              icon={<Clock color={Theme.colors.status.warning.text} size={20} />}
+              icon={
+                <Clock color={Theme.colors.status.warning.text} size={20} />
+              }
               variant="yellow"
               valueColor={Theme.colors.status.warning.text}
             />
@@ -351,7 +386,9 @@ export default function MaPresenceScreen() {
             <StatCard
               title="Absences"
               value={stats.absent_days}
-              icon={<XCircle color={Theme.colors.status.danger.text} size={20} />}
+              icon={
+                <XCircle color={Theme.colors.status.danger.text} size={20} />
+              }
               variant="coral"
               valueColor={Theme.colors.status.danger.text}
             />
@@ -369,13 +406,17 @@ export default function MaPresenceScreen() {
         <Card style={styles.calendarCard}>
           <View style={styles.calendarHeaderRow}>
             <Text style={styles.calendarSectionTitle}>Calendrier Mensuel</Text>
-            {isMonthlyLoading && <ActivityIndicator color={Theme.colors.primary} size="small" />}
+            {isMonthlyLoading && (
+              <ActivityIndicator color={Theme.colors.primary} size="small" />
+            )}
           </View>
 
           {/* Weekday Labels */}
           <View style={styles.weekdayRow}>
             {WEEKDAYS.map((w, idx) => (
-              <Text key={idx} style={styles.weekdayText}>{w}</Text>
+              <Text key={idx} style={styles.weekdayText}>
+                {w}
+              </Text>
             ))}
           </View>
 
@@ -407,7 +448,12 @@ export default function MaPresenceScreen() {
                   </Text>
 
                   {/* Indicator Dot */}
-                  <View style={[styles.dotIndicator, { backgroundColor: item.color }]} />
+                  <View
+                    style={[
+                      styles.dotIndicator,
+                      { backgroundColor: item.color },
+                    ]}
+                  />
                 </TouchableOpacity>
               );
             })}
@@ -418,19 +464,39 @@ export default function MaPresenceScreen() {
             <Text style={styles.legendTitle}>Légende des couleurs :</Text>
             <View style={styles.legendGrid}>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: Theme.colors.status.success.text }]} />
+                <View
+                  style={[
+                    styles.legendDot,
+                    { backgroundColor: Theme.colors.status.success.text },
+                  ]}
+                />
                 <Text style={styles.legendLabel}>Présent</Text>
               </View>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: Theme.colors.status.warning.text }]} />
+                <View
+                  style={[
+                    styles.legendDot,
+                    { backgroundColor: Theme.colors.status.warning.text },
+                  ]}
+                />
                 <Text style={styles.legendLabel}>Retard</Text>
               </View>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: Theme.colors.status.danger.text }]} />
+                <View
+                  style={[
+                    styles.legendDot,
+                    { backgroundColor: Theme.colors.status.danger.text },
+                  ]}
+                />
                 <Text style={styles.legendLabel}>Absent</Text>
               </View>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: Theme.colors.status.info.text }]} />
+                <View
+                  style={[
+                    styles.legendDot,
+                    { backgroundColor: Theme.colors.status.info.text },
+                  ]}
+                />
                 <Text style={styles.legendLabel}>Congé / Férié</Text>
               </View>
             </View>
@@ -448,7 +514,7 @@ export default function MaPresenceScreen() {
               <Text style={styles.claimsSub}>
                 {pendingAnomaliesCount > 0
                   ? `${pendingAnomaliesCount} réclamation(s) en cours d'examen RH.`
-                  : 'Déclarez un oubli de pointage ou une anomalie.'}
+                  : "Déclarez un oubli de pointage ou une anomalie."}
               </Text>
             </View>
           </View>
@@ -458,7 +524,7 @@ export default function MaPresenceScreen() {
             icon={<FileText color={Theme.colors.textWhite} size={16} />}
             onPress={() => {
               setAnomalyInitialDate(undefined);
-              setAnomalyTab('list');
+              setAnomalyTab("list");
               setShowAnomalyModal(true);
             }}
             variant="black"
@@ -513,9 +579,9 @@ const styles = StyleSheet.create({
     borderBottomColor: Theme.colors.border,
   },
   headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: Theme.spacing.md,
   },
   datePill: {
@@ -523,23 +589,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: Theme.radius.full,
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     borderWidth: 1,
     borderColor: Theme.colors.border,
   },
   datePillText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: "700",
     color: Theme.colors.textSecondary,
   },
   welcomeText: {
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: "800",
     color: Theme.colors.textPrimary,
     marginTop: 6,
   },
   headerActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
   },
   actionBtn: {
@@ -548,24 +614,24 @@ const styles = StyleSheet.create({
     borderRadius: Theme.radius.md,
     borderWidth: 1,
     borderColor: Theme.colors.border,
-    position: 'relative',
+    position: "relative",
   },
   notifBadge: {
     minWidth: 16,
     height: 16,
     backgroundColor: Theme.colors.primary,
     borderRadius: Theme.radius.full,
-    position: 'absolute',
+    position: "absolute",
     top: 4,
     right: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 3,
   },
   notifBadgeText: {
     color: Theme.colors.textWhite,
     fontSize: 9,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   checkInBtn: {
     marginTop: 4,
@@ -581,9 +647,9 @@ const styles = StyleSheet.create({
   },
 
   monthSelectorBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     backgroundColor: Theme.colors.surface,
     borderRadius: Theme.radius.xl,
     paddingHorizontal: 14,
@@ -597,14 +663,14 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   monthTitleWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   monthTitle: {
     color: Theme.colors.textPrimary,
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: "800",
   },
 
   statsGrid: {
@@ -612,7 +678,7 @@ const styles = StyleSheet.create({
     marginBottom: Theme.spacing.lg,
   },
   statsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: Theme.spacing.md,
   },
 
@@ -620,42 +686,42 @@ const styles = StyleSheet.create({
     marginBottom: Theme.spacing.lg,
   },
   calendarHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 14,
   },
   calendarSectionTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: "800",
     color: Theme.colors.textPrimary,
   },
 
   weekdayRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: 8,
   },
   weekdayText: {
     flex: 1,
-    textAlign: 'center',
+    textAlign: "center",
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
     color: Theme.colors.textTertiary,
   },
 
   daysGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
   },
   emptyDayCell: {
-    width: '14.28%',
+    width: "14.28%",
     height: 48,
   },
   dayCell: {
-    width: '14.28%',
+    width: "14.28%",
     height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: Theme.radius.md,
     marginBottom: 6,
   },
@@ -665,7 +731,7 @@ const styles = StyleSheet.create({
   },
   dayNumberText: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   dotIndicator: {
     width: 5,
@@ -682,18 +748,18 @@ const styles = StyleSheet.create({
   },
   legendTitle: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
     color: Theme.colors.textSecondary,
     marginBottom: 8,
   },
   legendGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
   },
   legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   legendDot: {
@@ -704,20 +770,20 @@ const styles = StyleSheet.create({
   legendLabel: {
     fontSize: 11,
     color: Theme.colors.textSecondary,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 
   claimsBanner: {
     gap: 14,
   },
   claimsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 14,
   },
   claimsTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: "800",
     color: Theme.colors.textPrimary,
   },
   claimsSub: {
